@@ -1,0 +1,40 @@
+{
+  "name": "manage-npm-pkg",
+  "displayName": "manage-npm-pkg",
+  "description": "A VS Code extension for managing npm packages.",
+  "version": "0.0.1",
+  "engines": {
+    "vscode": "^1.118.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "activationEvents": [],
+  "main": "./out/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "manage-npm-pkg.helloWorld",
+        "title": "Hello World"
+      }
+    ]
+  },
+  "scripts": {
+    "vscode:prepublish": "pnpm run compile",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "pretest": "pnpm run compile && pnpm run lint",
+    "check": "pnpm biome check",
+    "check@fix": "pnpm biome check --write",
+    "test": "vscode-test"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "2.4.13",
+    "@types/mocha": "^10.0.10",
+    "@types/node": "22.x",
+    "@types/vscode": "^1.118.0",
+    "@vscode/test-cli": "^0.0.12",
+    "@vscode/test-electron": "^2.5.2",
+    "typescript": "^5.9.3"
+  }
+}
