@@ -6,8 +6,8 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
-    "lint": "eslint .",
-    "preview": "vite preview"
+    "check": "pnpm biome check",
+    "check@fix": "pnpm biome check --write"
   },
   "dependencies": {
     "react": "^19.2.5",

@@ -9,9 +9,7 @@
   "categories": [
     "Other"
   ],
-  "activationEvents": [
-    "*"
-  ],
+  "activationEvents": ["*"],
   "main": "./out/extension.js",
   "contributes": {
     "commands": [
@@ -19,7 +17,17 @@
         "command": "manage-npm-pkg.start",
         "title": "Manage NPM Package: Start"
       }
-    ]
+    ],
+    "views": {
+      "explorer": [
+        {
+          "type": "webview",
+          "id": "manage-npm-pkg.sidebar",
+          "name": "Manage NPM Package",
+          "icon": ""
+        }
+      ]
+    }
   },
   "scripts": {
     "vscode:prepublish": "pnpm run compile && pnpm check",

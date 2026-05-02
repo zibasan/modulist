@@ -1,101 +1,73 @@
-import { useState } from 'react';
-import heroImg from './assets/hero.png';
-import reactLogo from './assets/react.svg';
-import viteLogo from './assets/vite.svg';
-import './App.css';
+import { useEffect, useState } from 'react';
+import './index.css';
+
+const vscode = acquireVsCodeApi();
+
+// パッケージのデータ型を定義
+type PackageData = {
+  dependencies: Record<string, string>;
+  devDependencies: Record<string, string>;
+};
 
 function App() {
-  const [count, setCount] = useState(0);
+  const [packages, setPackages] = useState<PackageData | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    // VS Codeからのメッセージを受け取るリスナー
+    const handleMessage = (event: MessageEvent) => {
+      const message = event.data;
+
+      if (message.command === 'packageData') {
+        setPackages(message.data);
+        setError(null);
+      } else if (message.command === 'error') {
+        setError(message.text);
+      }
+    };
+
+    window.addEventListener('message', handleMessage);
+
+    // 画面が開かれた直後に、VS Codeへ「パッケージ情報をちょうだい」とリクエストする
+    vscode.postMessage({ command: 'getPackages' });
+
+    return () => window.removeEventListener('message', handleMessage);
+  }, []);
+
+  // パッケージ一覧をレンダリングする部品
+  const renderPackageList = (title: string, pkgRecord: Record<string, string> | undefined) => {
+    if (!pkgRecord || Object.keys(pkgRecord).length === 0) return null;
+
+    return (
+      <div className="mb-6">
+        <h2 className="text-lg font-bold mb-2 border-b border-gray-600 pb-1">{title}</h2>
+        <ul className="space-y-1">
+          {Object.entries(pkgRecord).map(([name, version]) => (
+            <li key={name} className="flex justify-between items-center bg-gray-800 p-2 rounded">
+              <span className="font-mono text-sm text-blue-300">{name}</span>
+              <span className="font-mono text-xs text-gray-400">{version}</span>
+            </li>
+          ))}
+        </ul>
+      </div>
+    );
+  };
 
   return (
-    <>
-      <section id="center">
-        <div className="hero">
-          <img src={heroImg} className="base" width="170" height="179" alt="" />
-          <img src={reactLogo} className="framework" alt="React logo" />
-          <img src={viteLogo} className="vite" alt="Vite logo" />
-        </div>
-        <div>
-          <h1>Get started</h1>
-          <p>
-            Edit <code>src/App.tsx</code> and save to test <code>HMR</code>
-          </p>
-        </div>
-        <button type="button" className="counter" onClick={() => setCount((count) => count + 1)}>
-          Count is {count}
-        </button>
-      </section>
+    <div className="p-4 text-white">
+      <h1 className="text-xl font-bold mb-4">Manage NPM Packages</h1>
 
-      <div className="ticks"></div>
+      {error && <div className="bg-red-900/50 text-red-200 p-3 rounded mb-4 text-sm">{error}</div>}
 
-      <section id="next-steps">
-        <div id="docs">
-          <svg className="icon" role="presentation" aria-hidden="true">
-            <use href="/icons.svg#documentation-icon"></use>
-          </svg>
-          <h2>Documentation</h2>
-          <p>Your questions, answered</p>
-          <ul>
-            <li>
-              <a href="https://vite.dev/" target="_blank" rel="noopener">
-                <img className="logo" src={viteLogo} alt="" />
-                Explore Vite
-              </a>
-            </li>
-            <li>
-              <a href="https://react.dev/" target="_blank" rel="noopener">
-                <img className="button-icon" src={reactLogo} alt="" />
-                Learn more
-              </a>
-            </li>
-          </ul>
-        </div>
-        <div id="social">
-          <svg className="icon" role="presentation" aria-hidden="true">
-            <use href="/icons.svg#social-icon"></use>
-          </svg>
-          <h2>Connect with us</h2>
-          <p>Join the Vite community</p>
-          <ul>
-            <li>
-              <a href="https://github.com/vitejs/vite" target="_blank" rel="noopener">
-                <svg className="button-icon" role="presentation" aria-hidden="true">
-                  <use href="/icons.svg#github-icon"></use>
-                </svg>
-                GitHub
-              </a>
-            </li>
-            <li>
-              <a href="https://chat.vite.dev/" target="_blank" rel="noopener">
-                <svg className="button-icon" role="presentation" aria-hidden="true">
-                  <use href="/icons.svg#discord-icon"></use>
-                </svg>
-                Discord
-              </a>
-            </li>
-            <li>
-              <a href="https://x.com/vite_js" target="_blank" rel="noopener">
-                <svg className="button-icon" role="presentation" aria-hidden="true">
-                  <use href="/icons.svg#x-icon"></use>
-                </svg>
-                X.com
-              </a>
-            </li>
-            <li>
-              <a href="https://bsky.app/profile/vite.dev" target="_blank" rel="noopener">
-                <svg className="button-icon" role="presentation" aria-hidden="true">
-                  <use href="/icons.svg#bluesky-icon"></use>
-                </svg>
-                Bluesky
-              </a>
-            </li>
-          </ul>
-        </div>
-      </section>
+      {!packages && !error && <p className="text-gray-400">パッケージ情報を読み込み中...</p>}
 
-      <div className="ticks"></div>
-      <section id="spacer"></section>
-    </>
+      {packages && (
+        <>
+          {renderPackageList('Dependencies', packages.dependencies)}
+          {renderPackageList('Dev Dependencies', packages.devDependencies)}
+        </>
+      )}
+    </div>
   );
 }
 
