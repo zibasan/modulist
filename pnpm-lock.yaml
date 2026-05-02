@@ -9,7 +9,7 @@ importers:
   .:
     devDependencies:
       '@biomejs/biome':
-        specifier: ^2.4.13
+        specifier: 2.4.13
         version: 2.4.13
       '@types/mocha':
         specifier: ^10.0.10

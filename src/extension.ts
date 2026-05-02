@@ -1,26 +1,63 @@
-// The module 'vscode' contains the VS Code extensibility API
-// Import the module and reference it with the alias vscode in your code below
+// src/extension.ts
+
+import * as path from 'node:path';
 import * as vscode from 'vscode';
 
-// This method is called when your extension is activated
-// Your extension is activated the very first time the command is executed
 export function activate(context: vscode.ExtensionContext) {
+  const disposable = vscode.commands.registerCommand('pkg-manager.start', () => {
+    // 1. Webviewパネルを作成
+    const panel = vscode.window.createWebviewPanel(
+      'pkgManagerPanel',
+      'Package Manager',
+      vscode.ViewColumn.One,
+      {
+        enableScripts: true, // Webview内でJavaScriptの実行を許可
+        retainContextWhenHidden: true, // パネルが非表示になっても状態を保持
+        // 拡張機能のディレクトリ内からのみリソースの読み込みを許可
+        localResourceRoots: [
+          vscode.Uri.file(path.join(context.extensionPath, 'webview-ui', 'dist')),
+        ],
+      },
+    );
 
-	// Use the console to output diagnostic information (console.log) and errors (console.error)
-	// This line of code will only be executed once when your extension is activated
-	console.log('Congratulations, your extension "manage-npm-pkg" is now active!');
+    // 2. ビルドされたReactアプリのパスを取得
+    const scriptPathOnDisk = vscode.Uri.file(
+      path.join(context.extensionPath, 'webview-ui', 'dist', 'assets', 'index.js'),
+    );
+    const stylePathOnDisk = vscode.Uri.file(
+      path.join(context.extensionPath, 'webview-ui', 'dist', 'assets', 'index.css'),
+    );
 
-	// The command has been defined in the package.json file
-	// Now provide the implementation of the command with registerCommand
-	// The commandId parameter must match the command field in package.json
-	const disposable = vscode.commands.registerCommand('manage-npm-pkg.helloWorld', () => {
-		// The code you place here will be executed every time your command is executed
-		// Display a message box to the user
-		vscode.window.showInformationMessage('Hello World from manage-npm-pkg!');
-	});
+    // 3. Webviewが読み込める特殊なURIに変換
+    const scriptUri = panel.webview.asWebviewUri(scriptPathOnDisk);
+    const styleUri = panel.webview.asWebviewUri(stylePathOnDisk);
 
-	context.subscriptions.push(disposable);
+    // 4. WebviewにHTMLをセット
+    panel.webview.html = getWebviewContent(scriptUri, styleUri);
+  });
+
+  context.subscriptions.push(disposable);
 }
 
-// This method is called when your extension is deactivated
+// HTMLテンプレートを生成する関数
+function getWebviewContent(scriptUri: vscode.Uri, styleUri: vscode.Uri) {
+  return `<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Package Manager</title>
+    <!-- ReactアプリのCSSを読み込む -->
+    <link href="${styleUri}" rel="stylesheet">
+</head>
+<body>
+    <!-- Reactアプリがマウントされる場所 -->
+    <div id="root"></div>
+
+    <!-- ReactアプリのJSを読み込む -->
+    <script type="module" src="${scriptUri}"></script>
+</body>
+</html>`;
+}
+
 export function deactivate() {}
