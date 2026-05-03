@@ -11,5 +11,8 @@
   "command.showInfoOutput": "Modulist: 出力パネルで詳細を表示",
   "action.runScript": "スクリプトを実行",
   "action.updateAll": "Modulist: すべてアップデート",
-  "action.scanUnused": "Modulist: 未使用パッケージをスキャン"
+  "action.scanUnused": "Modulist: 未使用パッケージをスキャン",
+  "action.changeVersion": "特定のバージョンをインストール",
+  "action.togglePin": "バージョンの固定/解除 (^)",
+  "action.openChangelog": "リリースノートを開く"
 }

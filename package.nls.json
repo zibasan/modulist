@@ -11,5 +11,8 @@
   "command.showInfoOutput": "Show Details in Output Panel",
   "action.runScript": "Run Script",
   "action.updateAll": "Update All Outdated",
-  "action.scanUnused": "Scan Unused Packages"
+  "action.scanUnused": "Scan Unused Packages",
+  "action.changeVersion": "Install Specific Version",
+  "action.togglePin": "Toggle Version Pinning (^)",
+  "action.openChangelog": "Open Release Notes"
 }

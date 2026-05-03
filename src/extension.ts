@@ -35,6 +35,24 @@ export function activate(context: vscode.ExtensionContext) {
         const res = await fetch(`https://registry.npmjs.org/${pkgName}`);
         const data = (await res.json()) as NpmRegistryResponse;
 
+        let bundleSizeText = 'Unknown';
+        try {
+          const bpRes = await fetch(
+            `https://bundlephobia.com/api/size?package=${encodeURIComponent(pkgName)}`,
+            {
+              headers: { 'User-Agent': 'VSCode-Modulist-Extension' },
+            },
+          );
+          if (bpRes.ok) {
+            const bpData = (await bpRes.json()) as { size: number; gzip: number };
+            bundleSizeText = `${formatBytes(bpData.size)} (${t('info.minified')}) / ${formatBytes(bpData.gzip)} (${t('info.gzipped')})`;
+          } else {
+            bundleSizeText = 'Unknown';
+          }
+        } catch (_e) {
+          /* 取得失敗時は無視 */
+        }
+
         outputChannel.clear();
         outputChannel.appendLine(`========================================`);
         outputChannel.appendLine(
@@ -43,6 +61,7 @@ export function activate(context: vscode.ExtensionContext) {
         outputChannel.appendLine(`========================================`);
         outputChannel.appendLine(`📝 Description : ${data.description || 'N/A'}`);
         outputChannel.appendLine(`🔗 Publisher   : ${data.author?.name || 'Unknown'}`);
+        outputChannel.appendLine(`📦 Bundle Size : ${bundleSizeText}`);
         outputChannel.appendLine(`🌐 NPM Site    : https://www.npmjs.com/package/${pkgName}`);
 
         const repoUrl = data.repository?.url?.replace(/^git\+/, '').replace(/\.git$/, '');
@@ -333,6 +352,107 @@ export function activate(context: vscode.ExtensionContext) {
       },
     );
   });
+
+  // ④ 特定のバージョンをインストール（ダウングレード/ロールバック）
+  vscode.commands.registerCommand('modulist.changeVersion', async (item: ModulistItem) => {
+    if (!item.fsPath) return; // 安全確認
+
+    try {
+      // NPM APIから全バージョン履歴を取得
+      const res = await fetch(`https://registry.npmjs.org/${item.label}`);
+      const data = (await res.json()) as { versions: Record<string, unknown> };
+
+      // バージョン一覧を取得し、新しい順（降順）に並び替え
+      const versions = Object.keys(data.versions).reverse();
+
+      const selectedVersion = await vscode.window.showQuickPick(versions, {
+        placeHolder: `${t('prompt.selectVersion')} (${item.label})`,
+      });
+
+      if (selectedVersion) {
+        // Dev Dependency の場合は -D フラグをつける
+        const flag = item.isDev ? '-D ' : '';
+        runTerminalCommand(`pnpm add ${flag}${item.label}@${selectedVersion}`, item.fsPath);
+      }
+    } catch (_e) {
+      vscode.window.showErrorMessage('バージョン履歴の取得に失敗しました。');
+    }
+  });
+
+  // ⑤ バージョンの固定 / 固定解除 (Pin / Unpin)
+  vscode.commands.registerCommand('modulist.togglePin', async (item: ModulistItem) => {
+    if (!item.fsPath) return; // 安全確認
+
+    try {
+      // package.json を直接読み込む
+      const packageJsonUri = vscode.Uri.file(path.join(item.fsPath, 'package.json'));
+      const fileData = await vscode.workspace.fs.readFile(packageJsonUri);
+      const packageJson = JSON.parse(new TextDecoder().decode(fileData));
+
+      const depType = item.isDev ? 'devDependencies' : 'dependencies';
+      const currentVersion = packageJson[depType][item.label];
+
+      if (!currentVersion) return;
+
+      let newVersion = currentVersion;
+      let isPinning = false;
+
+      // すでに ^ や ~ が付いている場合は外す（固定する）
+      if (currentVersion.startsWith('^') || currentVersion.startsWith('~')) {
+        newVersion = currentVersion.replace(/^[\^~]/, '');
+        isPinning = true;
+      } else {
+        // 付いていない場合は ^ をつける（固定解除する）
+        newVersion = `^${currentVersion}`;
+      }
+
+      // package.json のオブジェクトを更新
+      packageJson[depType][item.label] = newVersion;
+
+      // 変更をファイルに書き込む (整形して保存)
+      const newContent = new TextEncoder().encode(`${JSON.stringify(packageJson, null, 2)}\n`);
+      await vscode.workspace.fs.writeFile(packageJsonUri, newContent);
+
+      // 結果を通知
+      if (isPinning) {
+        vscode.window.showInformationMessage(t('info.pinned', item.label, newVersion));
+      } else {
+        vscode.window.showInformationMessage(t('info.unpinned', item.label, newVersion));
+      }
+    } catch (_e) {
+      vscode.window.showErrorMessage('package.json の更新に失敗しました。');
+    }
+  });
+
+  // ⑦ チェンジログ（リリースノート）を開く
+  vscode.commands.registerCommand('modulist.openChangelog', async (item: ModulistItem) => {
+    if (!item.fsPath) return;
+
+    try {
+      const res = await fetch(`https://registry.npmjs.org/${item.label}`);
+      const data = (await res.json()) as NpmRegistryResponse;
+
+      let repoUrl = data.repository?.url?.replace(/^git\+/, '').replace(/\.git$/, '');
+
+      if (repoUrl) {
+        // git:// や git@github.com: などの形式を標準の https:// に変換
+        repoUrl = repoUrl
+          .replace(/^git:\/\//, 'https://')
+          .replace(/^git@github\.com:/, 'https://github.com/');
+
+        // GitHub や GitLab の場合は、直接 releases ページを開く
+        if (repoUrl.includes('github.com') || repoUrl.includes('gitlab.com')) {
+          repoUrl = `${repoUrl}/releases`;
+        }
+
+        vscode.env.openExternal(vscode.Uri.parse(repoUrl));
+      } else {
+        vscode.window.showInformationMessage('このパッケージのリポジトリ情報が見つかりません。');
+      }
+    } catch (_e) {
+      vscode.window.showErrorMessage('情報の取得に失敗しました。');
+    }
+  });
 }
 
 function runTerminalCommand(command: string, cwd?: string) {
@@ -455,6 +575,23 @@ class NpmDependenciesProvider implements vscode.TreeDataProvider<ModulistItem> {
       const repoUrl =
         data.repository?.url?.replace(/^git\+/, '').replace(/\.git$/, '') || 'リポジトリ情報不明';
       const downloads = downloadData.downloads || '?';
+      let bundleSizeText = '?';
+      try {
+        const bpRes = await fetch(
+          `https://bundlephobia.com/api/size?package=${encodeURIComponent(element.label)}`,
+          {
+            headers: { 'User-Agent': 'VSCode-Modulist-Extension' },
+          },
+        );
+        if (bpRes.ok) {
+          const bpData = (await bpRes.json()) as { size: number; gzip: number };
+          bundleSizeText = `**${formatBytes(bpData.size)}** (${t('info.minified')}) / **${formatBytes(bpData.gzip)}** (${t('info.gzipped')})`;
+        } else {
+          bundleSizeText = '?'; // 取得できなかった時のメッセージを明確に
+        }
+      } catch (_e) {
+        /* 取得失敗時は無視 */
+      }
 
       const tooltip = new vscode.MarkdownString('', true);
       tooltip.supportThemeIcons = true;
@@ -462,6 +599,7 @@ class NpmDependenciesProvider implements vscode.TreeDataProvider<ModulistItem> {
       tooltip.appendMarkdown(
         `$(info) Latest: **\`${latestVersion}\`** | $(law) \`${license}\` | $(cloud-download) 週間ダウンロード数: **${downloads}**\n\n`,
       );
+      tooltip.appendMarkdown(`$(package) **${t('info.bundleSize')}**: ${bundleSizeText}\n\n`);
       tooltip.appendMarkdown(`$(accounts-view-bar-icon) 制作者: **${author}**\n\n`);
       tooltip.appendMarkdown(`$(info) 説明: *\`${description}\`*\n\n`);
       tooltip.appendMarkdown(`$(link-external) ホームページ: [開く](${homepage})\n\n`);
@@ -610,3 +748,11 @@ class ModulistItem extends vscode.TreeItem {
 }
 
 export function deactivate() {}
+
+function formatBytes(bytes: number) {
+  if (bytes === 0) return '0 B';
+  const k = 1024;
+  const sizes = ['B', 'KB', 'MB', 'GB'];
+  const i = Math.floor(Math.log(bytes) / Math.log(k));
+  return `${Number.parseFloat((bytes / k ** i).toFixed(1))} ${sizes[i]}`;
+}
