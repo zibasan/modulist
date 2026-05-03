@@ -28,6 +28,11 @@
         "icon": "$(refresh)"
       },
       {
+        "command": "manageNpmPkg.add",
+        "title": "Add Package",
+        "icon": "$(add)"
+      },
+      {
         "command": "manageNpmPkg.openInfo",
         "title": "Open on npm",
         "icon": "$(info)"
@@ -45,6 +50,11 @@
     ],
     "menus": {
       "view/title": [
+        {
+          "command": "manageNpmPkg.add",
+          "when": "view == manageNpmPkgView",
+          "group": "navigation"
+        },
         {
           "command": "manageNpmPkg.refresh",
           "when": "view == manageNpmPkgView",
@@ -66,6 +76,21 @@
           "command": "manageNpmPkg.remove",
           "when": "view == manageNpmPkgView && viewItem == dependency",
           "group": "inline"
+        },
+        {
+          "command": "manageNpmPkg.openInfo",
+          "when": "view == manageNpmPkgView && viewItem == dependency",
+          "group": "1_actions"
+        },
+        {
+          "command": "manageNpmPkg.update",
+          "when": "view == manageNpmPkgView && viewItem == dependency",
+          "group": "2_modifications"
+        },
+        {
+          "command": "manageNpmPkg.remove",
+          "when": "view == manageNpmPkgView && viewItem == dependency",
+          "group": "3_danger"
         }
       ]
     }

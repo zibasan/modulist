@@ -25,3 +25,7 @@ export type NpmRegistryResponse = {
 export type NpmRepoDownloadsResponse = {
   downloads: number;
 };
+
+export type NpmSearchResponse = {
+  objects: { package: { name: string; version: string; description: string } }[];
+};

@@ -1,6 +1,10 @@
 import * as vscode from 'vscode';
 import { createReadmeText } from './utils/functions';
-import type { NpmRegistryResponse, NpmRepoDownloadsResponse } from './utils/types';
+import type {
+  NpmRegistryResponse,
+  NpmRepoDownloadsResponse,
+  NpmSearchResponse,
+} from './utils/types';
 
 export function activate(context: vscode.ExtensionContext) {
   const rootPath =
@@ -26,14 +30,87 @@ export function activate(context: vscode.ExtensionContext) {
   // コマンドの登録
   context.subscriptions.push(
     vscode.commands.registerCommand('manageNpmPkg.refresh', () => npmProvider.refresh()),
+
+    // ★ 新機能1: パッケージの検索と追加 (QuickPickを使用)
+    vscode.commands.registerCommand('manageNpmPkg.add', async () => {
+      // 1. 検索ワードを入力させる
+      const query = await vscode.window.showInputBox({
+        prompt: '検索するNPMパッケージ名を入力してください',
+        placeHolder: '例: react, typescript, tailwindcss',
+      });
+      if (!query) return;
+
+      // 2. NPM APIで検索を実行
+      const res = await fetch(
+        `https://registry.npmjs.org/-/v1/search?text=${encodeURIComponent(query)}&size=10`,
+      );
+      const data = (await res.json()) as NpmSearchResponse; // (型定義があれば NpmSearchResponse に置き換え)
+
+      if (!data.objects || data.objects.length === 0) {
+        vscode.window.showInformationMessage('パッケージが見つかりませんでした。');
+        return;
+      }
+
+      // 3. 検索結果をQuickPick（選択肢）に変換
+      const items: vscode.QuickPickItem[] = data.objects.map((obj) => ({
+        label: obj.package.name,
+        description: `v${obj.package.version}`,
+        detail: obj.package.description,
+      }));
+
+      // 4. ユーザーに選ばせる
+      const selectedPkg = await vscode.window.showQuickPick(items, {
+        placeHolder: 'インストールするパッケージを選択してください',
+      });
+      if (!selectedPkg) {
+        return;
+      }
+
+      // 5. インストールの種類（通常かDevか）を選ばせる
+      const installType = await vscode.window.showQuickPick(
+        [{ label: 'Dependencies' }, { label: 'Dev Dependencies' }],
+        { placeHolder: `${selectedPkg.label} のインストール先を選択してください` },
+      );
+      if (!installType) {
+        return;
+      }
+
+      const isDev = installType.label === 'Dev Dependencies';
+      // 6. 確認ダイアログを表示
+      const answer = await vscode.window.showInformationMessage(
+        `パッケージ '${selectedPkg.label}' を「${isDev ? '開発' : '通常'}依存関係」としてインストールしますか？`,
+        { modal: false },
+        'インストールする',
+      );
+
+      // 7. ターミナルで実行
+      if (answer === 'インストールする') {
+        runTerminalCommand(
+          isDev ? `pnpm add -D ${selectedPkg.label}` : `pnpm add ${selectedPkg.label}`,
+        );
+      }
+    }),
+
     vscode.commands.registerCommand('manageNpmPkg.openInfo', (item: Dependency) => {
       vscode.env.openExternal(vscode.Uri.parse(`https://www.npmjs.com/package/${item.label}`));
     }),
+
     vscode.commands.registerCommand('manageNpmPkg.update', (item: Dependency) => {
       runTerminalCommand(`pnpm update ${item.label}`);
     }),
-    vscode.commands.registerCommand('manageNpmPkg.remove', (item: Dependency) => {
-      runTerminalCommand(`pnpm remove ${item.label}`);
+
+    // 削除時の確認ダイアログ
+    vscode.commands.registerCommand('manageNpmPkg.remove', async (item: Dependency) => {
+      // showWarningMessage の第2引数に { modal: true } を渡すと、画面中央にダイアログが出ます
+      const answer = await vscode.window.showWarningMessage(
+        `パッケージ '${item.label}' を本当にアンインストールしますか？`,
+        { modal: true },
+        'アンインストールする',
+      );
+
+      if (answer === 'アンインストールする') {
+        runTerminalCommand(`pnpm remove ${item.label}`);
+      }
     }),
   );
 }
