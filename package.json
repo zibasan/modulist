@@ -22,38 +22,127 @@
       ]
     },
     "commands": [
-      { "command": "modulist.refresh", "title": "%command.refresh%", "icon": "$(refresh)" },
-      { "command": "modulist.add", "title": "%command.add%", "icon": "$(add)" },
-      { "command": "modulist.openInfo", "title": "%command.openInfo%", "icon": "$(globe)" },
-      { "command": "modulist.showInfoOutput", "title": "%command.showInfoOutput%", "icon": "$(output)" },
-      { "command": "modulist.update", "title": "%command.update%", "icon": "$(sync)" },
-      { "command": "modulist.remove", "title": "%command.remove%", "icon": "$(trash)" },
-      { "command": "modulist.searchLocal", "title": "%command.searchLocal%", "icon": "$(search)" },
-      { "command": "modulist.searchNpmAndAction", "title": "%command.searchNpmAndAction%" },
-      { "command": "modulistView.focus", "title": "%command.focusView%" }
+      {
+        "command": "modulist.refresh",
+        "title": "%command.refresh%",
+        "icon": "$(refresh)"
+      },
+      {
+        "command": "modulist.add",
+        "title": "%command.add%",
+        "icon": "$(add)"
+      },
+      {
+        "command": "modulist.openInfo",
+        "title": "%command.openInfo%",
+        "icon": "$(globe)"
+      },
+      {
+        "command": "modulist.showInfoOutput",
+        "title": "%command.showInfoOutput%",
+        "icon": "$(output)"
+      },
+      {
+        "command": "modulist.update",
+        "title": "%command.update%",
+        "icon": "$(sync)"
+      },
+      {
+        "command": "modulist.remove",
+        "title": "%command.remove%",
+        "icon": "$(trash)"
+      },
+      {
+        "command": "modulist.searchLocal",
+        "title": "%command.searchLocal%",
+        "icon": "$(search)"
+      },
+      {
+        "command": "modulist.searchNpmAndAction",
+        "title": "%command.searchNpmAndAction%"
+      },
+      {
+        "command": "modulistView.focus",
+        "title": "%command.focusView%"
+      }
     ],
     "menus": {
       "commandPalette": [
-        { "command": "modulist.openInfo", "when": "false" },
-        { "command": "modulist.update", "when": "false" },
-        { "command": "modulist.remove", "when": "false" },
-        { "command": "modulist.showInfoOutput", "when": "false" }
+        {
+          "command": "modulist.openInfo",
+          "when": "false"
+        },
+        {
+          "command": "modulist.update",
+          "when": "false"
+        },
+        {
+          "command": "modulist.remove",
+          "when": "false"
+        },
+        {
+          "command": "modulist.showInfoOutput",
+          "when": "false"
+        }
       ],
       "view/title": [
-        { "command": "modulist.add", "when": "view == modulistView", "group": "navigation@1" },
-        { "command": "modulist.searchLocal", "when": "view == modulistView", "group": "navigation@2" },
-        { "command": "modulist.refresh", "when": "view == modulistView", "group": "navigation@3" }
+        {
+          "command": "modulist.add",
+          "when": "view == modulistView",
+          "group": "navigation@1"
+        },
+        {
+          "command": "modulist.searchLocal",
+          "when": "view == modulistView",
+          "group": "navigation@2"
+        },
+        {
+          "command": "modulist.refresh",
+          "when": "view == modulistView",
+          "group": "navigation@3"
+        }
       ],
       "view/item/context": [
-        { "command": "modulist.showInfoOutput", "when": "view == modulistView && viewItem =~ /^dependency/", "group": "inline" },
-        { "command": "modulist.update", "when": "view == modulistView && viewItem == dependency-outdated", "group": "inline" },
-        { "command": "modulist.openInfo", "when": "view == modulistView && viewItem =~ /^dependency/", "group": "inline" },
-        { "command": "modulist.remove", "when": "view == modulistView && viewItem =~ /^dependency/", "group": "inline" },
-
-        { "command": "modulist.showInfoOutput", "when": "view == modulistView && viewItem =~ /^dependency/", "group": "1_actions@1" },
-        { "command": "modulist.openInfo", "when": "view == modulistView && viewItem =~ /^dependency/", "group": "1_actions@2" },
-        { "command": "modulist.update", "when": "view == modulistView && viewItem == dependency-outdated", "group": "2_modifications" },
-        { "command": "modulist.remove", "when": "view == modulistView && viewItem =~ /^dependency/", "group": "3_danger" }
+        {
+          "command": "modulist.showInfoOutput",
+          "when": "view == modulistView && viewItem =~ /^dependency/",
+          "group": "inline"
+        },
+        {
+          "command": "modulist.update",
+          "when": "view == modulistView && viewItem == dependency-outdated",
+          "group": "inline"
+        },
+        {
+          "command": "modulist.openInfo",
+          "when": "view == modulistView && viewItem =~ /^dependency/",
+          "group": "inline"
+        },
+        {
+          "command": "modulist.remove",
+          "when": "view == modulistView && viewItem =~ /^dependency/",
+          "group": "inline"
+        },
+        {
+          "command": "modulist.showInfoOutput",
+          "when": "view == modulistView && viewItem =~ /^dependency/",
+          "group": "1_actions@1"
+        },
+        {
+          "command": "modulist.openInfo",
+          "when": "view == modulistView && viewItem =~ /^dependency/",
+          "group": "1_actions@2"
+        },
+        {
+          "command": "modulist.update",
+          "when": "view == modulistView && viewItem == dependency-outdated",
+          "group": "2_modifications"
+        },
+        {
+          "command": "modulist.remove",
+          "when": "view == modulistView && viewItem =~ /^dependency/",
+          "group": "3_danger"
+        }
       ]
     }
   },

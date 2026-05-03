@@ -270,7 +270,7 @@ export function activate(context: vscode.ExtensionContext) {
 
     vscode.commands.registerCommand('modulist.remove', async (item: Dependency) => {
       const answer = await vscode.window.showWarningMessage(
-        `${t('prompt.confirmRemove')} '${item.label}' ?`,
+        t('prompt.confirmRemove', item.label),
         { modal: true },
         t('btn.remove'),
       );
@@ -418,7 +418,7 @@ class NpmDependenciesProvider implements vscode.TreeDataProvider<Dependency> {
 
   async getChildren(element?: Dependency): Promise<Dependency[]> {
     if (!this.workspaceRoot) {
-      vscode.window.showInformationMessage('No dependency in empty workspace');
+      vscode.window.showInformationMessage('No workspace found');
       return Promise.resolve([]);
     }
 
@@ -429,32 +429,30 @@ class NpmDependenciesProvider implements vscode.TreeDataProvider<Dependency> {
         const fileData = await vscode.workspace.fs.readFile(packageJsonUri);
         const packageJson = JSON.parse(new TextDecoder().decode(fileData));
 
-        const deps =
-          element.label === 'Dependencies' ? packageJson.dependencies : packageJson.devDependencies;
+        // ★ 変更: 翻訳されたラベルを使って判定する
+        const isDev = element.label === t('label.devDep');
+        const deps = isDev ? packageJson.devDependencies : packageJson.dependencies;
+
         if (!deps) return [];
 
         return Object.keys(deps).map((depName) => {
-          // ★ 新設: アウトデイトかどうかの判定を行い、contextValue を切り替える
           const isOutdated = this.outdatedDeps.has(depName);
           return new Dependency(
             depName,
             deps[depName],
             vscode.TreeItemCollapsibleState.None,
             isOutdated ? 'dependency-outdated' : 'dependency',
+            isDev, // ★ 追加: 開発用かどうかのフラグを渡す
           );
         });
       } catch (_e) {
         return [];
       }
     } else {
+      // ★ 変更: カテゴリの表示名に i18n の t() 関数を適用
       return [
-        new Dependency('Dependencies', '', vscode.TreeItemCollapsibleState.Expanded, 'category'),
-        new Dependency(
-          'Dev Dependencies',
-          '',
-          vscode.TreeItemCollapsibleState.Expanded,
-          'category',
-        ),
+        new Dependency(t('label.dep'), '', vscode.TreeItemCollapsibleState.Expanded, 'category'),
+        new Dependency(t('label.devDep'), '', vscode.TreeItemCollapsibleState.Expanded, 'category'),
       ];
     }
   }
@@ -467,30 +465,35 @@ class Dependency extends vscode.TreeItem {
     public readonly version: string,
     public readonly collapsibleState: vscode.TreeItemCollapsibleState,
     public readonly contextValue: string,
+    public readonly isDev: boolean = false,
   ) {
     super(label, collapsibleState);
     this.description = this.version;
 
+    // ★ 変更: contextValue と isDev フラグによってアイコンの色を切り替える
     if (this.contextValue === 'category') {
       this.iconPath = new vscode.ThemeIcon('symbol-class');
     } else if (this.contextValue === 'dependency-outdated') {
-      // アップデートがある場合：アイコンを「警告色（黄色/オレンジ）」にする
+      // アップデートあり: 警告色（黄色/オレンジ）
       this.iconPath = new vscode.ThemeIcon(
         'package',
         new vscode.ThemeColor('list.warningForeground'),
       );
-    } else {
-      // 最新の場合：通常のテーマカラー（青など）にする
+    } else if (this.isDev) {
+      // Dev Dependencies: 通常のキーワード色（青/グレーなど）
       this.iconPath = new vscode.ThemeIcon(
         'package',
         new vscode.ThemeColor('problemsInfoIcon.foreground'),
       );
+    } else {
+      // Dependencies: 緑色（テスト成功時の緑色を利用）
+      this.iconPath = new vscode.ThemeIcon('package', new vscode.ThemeColor('testing.iconPassed'));
     }
 
     if (this.contextValue !== 'category') {
       this.command = {
         title: 'Open NPM Package Info',
-        command: 'modulist.openInfo', // コマンド名を変更
+        command: 'modulist.openInfo',
         arguments: [this],
       };
     }
