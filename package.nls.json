@@ -2,8 +2,8 @@
   "view.name": "Modulist - NPM Packages",
   "command.refresh": "Modulist: Refresh",
   "command.add": "Modulist: Add Package",
-  "command.remove": "Modulist: Remove Package",
-  "command.update": "Modulist: Update Package",
+  "command.remove": "Remove Package",
+  "command.update": "Update Package",
   "command.openInfo": "Modulist: Open on npm",
   "command.searchLocal": "Modulist: Search Installed Packages",
   "command.searchNpmAndAction": "Modulist: Search & Actions",
@@ -14,5 +14,8 @@
   "action.scanUnused": "Scan Unused Packages",
   "action.changeVersion": "Install Specific Version",
   "action.togglePin": "Toggle Version Pinning (^)",
-  "action.openChangelog": "Open Release Notes"
+  "action.openChangelog": "Open Release Notes",
+  "config.showConfirmations.desc": "Show a confirmation dialog before updating or removing packages.",
+  "config.showBundleSize.desc": "Display bundle size (using Bundlephobia API) in tooltips and the output panel.",
+  "config.showReadme.desc": "Display the package README in tooltips."
 }

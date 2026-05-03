@@ -12,12 +12,44 @@
   "activationEvents": [],
   "main": "./out/extension.js",
   "contributes": {
+    "configuration": {
+      "title": "Modulist",
+      "properties": {
+        "modulist.showConfirmations": {
+          "type": "boolean",
+          "default": true,
+          "description": "%config.showConfirmations.desc%",
+          "markdownDescription": "%config.showConfirmations.desc%"
+        },
+        "modulist.showBundleSize": {
+          "type": "boolean",
+          "default": true,
+          "description": "%config.showBundleSize.desc%",
+          "markdownDescription": "%config.showBundleSize.desc%"
+        },
+        "modulist.showReadme": {
+          "type": "boolean",
+          "default": true,
+          "description": "%config.showReadme.desc%",
+          "markdownDescription": "%config.showReadme.desc%"
+        }
+      }
+    },
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "modulist-container",
+          "title": "Modulist",
+          "icon": "$(package)"
+        }
+      ]
+    },
     "views": {
-      "explorer": [
+      "modulist-container": [
         {
           "id": "modulistView",
-          "name": "%view.name%",
-          "icon": ""
+          "name": "Packages",
+          "icon": "$(package)"
         }
       ]
     },

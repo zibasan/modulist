@@ -59,35 +59,39 @@ function activate(context) {
         try {
             const res = await fetch(`https://registry.npmjs.org/${pkgName}`);
             const data = (await res.json());
-            let bundleSizeText = 'Unknown';
-            try {
-                const bpRes = await fetch(`https://bundlephobia.com/api/size?package=${encodeURIComponent(pkgName)}`, {
-                    headers: { 'User-Agent': 'VSCode-Modulist-Extension' },
-                });
-                if (bpRes.ok) {
-                    const bpData = (await bpRes.json());
-                    bundleSizeText = `${formatBytes(bpData.size)} (${(0, i18n_1.t)('info.minified')}) / ${formatBytes(bpData.gzip)} (${(0, i18n_1.t)('info.gzipped')})`;
+            const config = vscode.workspace.getConfiguration('modulist');
+            const showBundleSize = config.get('showBundleSize', true);
+            let bundleSizeText = (0, i18n_1.t)('info.disabledInSettings');
+            if (showBundleSize) {
+                try {
+                    const bpRes = await fetch(`https://bundlephobia.com/api/size?package=${encodeURIComponent(pkgName)}`, {
+                        headers: { 'User-Agent': 'VSCode-Modulist-Extension' },
+                    });
+                    if (bpRes.ok) {
+                        const bpData = (await bpRes.json());
+                        bundleSizeText = `${formatBytes(bpData.size)} (${(0, i18n_1.t)('info.minified')}) / ${formatBytes(bpData.gzip)} (${(0, i18n_1.t)('info.gzipped')})`;
+                    }
+                    else {
+                        bundleSizeText = (0, i18n_1.t)('info.noData');
+                    }
                 }
-                else {
-                    bundleSizeText = 'Unknown';
+                catch (_e) {
+                    /* ignore */
                 }
-            }
-            catch (_e) {
-                /* 取得失敗時は無視 */
             }
             outputChannel.clear();
             outputChannel.appendLine(`========================================`);
-            outputChannel.appendLine(` 📦 ${data.name || pkgName} (v${data['dist-tags']?.latest || 'Unknown'})`);
+            outputChannel.appendLine(` 📦 ${data.name || pkgName} (v${data['dist-tags']?.latest || (0, i18n_1.t)('info.unknown')})`);
             outputChannel.appendLine(`========================================`);
-            outputChannel.appendLine(`📝 Description : ${data.description || 'N/A'}`);
-            outputChannel.appendLine(`🔗 Publisher   : ${data.author?.name || 'Unknown'}`);
-            outputChannel.appendLine(`📦 Bundle Size : ${bundleSizeText}`);
-            outputChannel.appendLine(`🌐 NPM Site    : https://www.npmjs.com/package/${pkgName}`);
+            outputChannel.appendLine(`📝 ${(0, i18n_1.t)('info.description')} : ${data.description || (0, i18n_1.t)('info.none')}`);
+            outputChannel.appendLine(`🔗 ${(0, i18n_1.t)('info.publisher')}   : ${data.author?.name || (0, i18n_1.t)('info.unknown')}`);
+            outputChannel.appendLine(`📦 ${(0, i18n_1.t)('info.bundleSize')} : ${bundleSizeText}`);
+            outputChannel.appendLine(`🌐 ${(0, i18n_1.t)('info.npmSite')}    : https://www.npmjs.com/package/${pkgName}`);
             const repoUrl = data.repository?.url?.replace(/^git\+/, '').replace(/\.git$/, '');
             if (repoUrl)
-                outputChannel.appendLine(`💻 Repository  : ${repoUrl}`);
+                outputChannel.appendLine(`💻 ${(0, i18n_1.t)('info.repository')}  : ${repoUrl}`);
             if (data.homepage)
-                outputChannel.appendLine(`🏠 Homepage    : ${data.homepage}`);
+                outputChannel.appendLine(`🏠 ${(0, i18n_1.t)('info.homepage')}    : ${data.homepage}`);
             outputChannel.show(true);
         }
         catch (_error) {
@@ -478,43 +482,47 @@ class NpmDependenciesProvider {
             const downloadResponse = await fetch(`https://api.npmjs.org/downloads/point/last-week/${element.label}`);
             const data = (await response.json());
             const downloadData = (await downloadResponse.json());
-            const description = data.description || '説明文なし';
-            const latestVersion = data['dist-tags']?.latest || '不明';
-            const license = data.license || 'ライセンス不明';
-            const author = data.author?.name || '作成者不明';
-            const readme = (0, functions_1.createReadmeText)(data.readme) || '';
-            const homepage = data.homepage || '*ホームページがありません*';
-            const repoUrl = data.repository?.url?.replace(/^git\+/, '').replace(/\.git$/, '') || 'リポジトリ情報不明';
+            const description = data.description || (0, i18n_1.t)('info.none');
+            const latestVersion = data['dist-tags']?.latest || (0, i18n_1.t)('info.unknown');
+            const license = data.license || (0, i18n_1.t)('info.unknown');
+            const author = data.author?.name || (0, i18n_1.t)('info.unknown');
+            const homepage = data.homepage || `*${(0, i18n_1.t)('info.none')}*`;
+            const repoUrl = data.repository?.url?.replace(/^git\+/, '').replace(/\.git$/, '') || (0, i18n_1.t)('info.unknown');
             const downloads = downloadData.downloads || '?';
-            let bundleSizeText = '?';
-            try {
-                const bpRes = await fetch(`https://bundlephobia.com/api/size?package=${encodeURIComponent(element.label)}`, {
-                    headers: { 'User-Agent': 'VSCode-Modulist-Extension' },
-                });
-                if (bpRes.ok) {
-                    const bpData = (await bpRes.json());
-                    bundleSizeText = `**${formatBytes(bpData.size)}** (${(0, i18n_1.t)('info.minified')}) / **${formatBytes(bpData.gzip)}** (${(0, i18n_1.t)('info.gzipped')})`;
+            const config = vscode.workspace.getConfiguration('modulist');
+            const showBundleSize = config.get('showBundleSize', true);
+            const showReadme = config.get('showReadme', true); // ★ 追加: READMEの設定を取得
+            let bundleSizeText = (0, i18n_1.t)('info.disabledInSettings');
+            if (showBundleSize) {
+                bundleSizeText = (0, i18n_1.t)('info.noData');
+                try {
+                    const bpRes = await fetch(`https://bundlephobia.com/api/size?package=${encodeURIComponent(element.label)}`, {
+                        headers: { 'User-Agent': 'VSCode-Modulist-Extension' },
+                    });
+                    if (bpRes.ok) {
+                        const bpData = (await bpRes.json());
+                        bundleSizeText = `**${formatBytes(bpData.size)}** (${(0, i18n_1.t)('info.minified')}) / **${formatBytes(bpData.gzip)}** (${(0, i18n_1.t)('info.gzipped')})`;
+                    }
                 }
-                else {
-                    bundleSizeText = '?'; // 取得できなかった時のメッセージを明確に
+                catch (_e) {
+                    /* ignore */
                 }
-            }
-            catch (_e) {
-                /* 取得失敗時は無視 */
             }
             const tooltip = new vscode.MarkdownString('', true);
             tooltip.supportThemeIcons = true;
             tooltip.appendMarkdown(`### ${element.label} \`${element.version}\`\n\n`);
-            tooltip.appendMarkdown(`$(info) Latest: **\`${latestVersion}\`** | $(law) \`${license}\` | $(cloud-download) 週間ダウンロード数: **${downloads}**\n\n`);
+            tooltip.appendMarkdown(`$(info) ${(0, i18n_1.t)('info.latestVersion')}: **\`${latestVersion}\`** | $(law) \`${license}\` | $(cloud-download) ${(0, i18n_1.t)('info.weeklyDownloads')}: **${downloads}**\n\n`);
             tooltip.appendMarkdown(`$(package) **${(0, i18n_1.t)('info.bundleSize')}**: ${bundleSizeText}\n\n`);
-            tooltip.appendMarkdown(`$(accounts-view-bar-icon) 制作者: **${author}**\n\n`);
-            tooltip.appendMarkdown(`$(info) 説明: *\`${description}\`*\n\n`);
-            tooltip.appendMarkdown(`$(link-external) ホームページ: [開く](${homepage})\n\n`);
-            tooltip.appendMarkdown(`$(mark-github) リポジトリ: [開く](${repoUrl})\n\n`);
+            tooltip.appendMarkdown(`$(accounts-view-bar-icon) ${(0, i18n_1.t)('info.author')}: **${author}**\n\n`);
+            tooltip.appendMarkdown(`$(info) ${(0, i18n_1.t)('info.description')}: *\`${description}\`*\n\n`);
+            tooltip.appendMarkdown(`$(link-external) ${(0, i18n_1.t)('info.homepage')}: [${(0, i18n_1.t)('info.open')}](${homepage})\n\n`);
+            tooltip.appendMarkdown(`$(mark-github) ${(0, i18n_1.t)('info.repository')}: [${(0, i18n_1.t)('info.open')}](${repoUrl})\n\n`);
             tooltip.appendMarkdown(`---\n\n`);
-            tooltip.appendMarkdown(`[$(link-external) NPMで詳細を確認する](https://www.npmjs.com/package/${element.label})\n\n`);
-            tooltip.appendMarkdown(`---\n\n`);
-            tooltip.appendMarkdown(`${readme}\n\n`);
+            // ★ 変更: 設定が true の時だけ README をパースして追加
+            if (showReadme && data.readme) {
+                const readme = (0, functions_1.createReadmeText)(data.readme) || '';
+                tooltip.appendMarkdown(`${readme}\n\n`);
+            }
             item.tooltip = tooltip;
             return item;
         }
