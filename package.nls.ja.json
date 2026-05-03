@@ -8,5 +8,8 @@
   "command.searchLocal": "Modulist: インストール済みパッケージを検索",
   "command.searchNpmAndAction": "Modulist: パッケージを検索してアクションを選択",
   "command.focusView": "Modulist: パッケージ一覧を開く",
-  "command.showInfoOutput": "Modulist: 出力パネルで詳細を表示"
+  "command.showInfoOutput": "Modulist: 出力パネルで詳細を表示",
+  "action.runScript": "スクリプトを実行",
+  "action.updateAll": "Modulist: すべてアップデート",
+  "action.scanUnused": "Modulist: 未使用パッケージをスキャン"
 }

@@ -36,31 +36,23 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.activate = activate;
 exports.deactivate = deactivate;
 const cp = __importStar(require("node:child_process"));
+const path = __importStar(require("node:path"));
 const node_util_1 = require("node:util");
 const vscode = __importStar(require("vscode"));
 const i18n_1 = require("./i18n");
 const functions_1 = require("./utils/functions");
 const exec = (0, node_util_1.promisify)(cp.exec);
-// 出力パネルの名前も Modulist に変更
 const outputChannel = vscode.window.createOutputChannel('Modulist Info');
 function activate(context) {
-    const rootPath = vscode.workspace.workspaceFolders && vscode.workspace.workspaceFolders.length > 0
-        ? vscode.workspace.workspaceFolders[0].uri
-        : undefined;
-    // ツリービューのプロバイダーを登録 (IDを modulistView に変更)
-    const npmProvider = new NpmDependenciesProvider(rootPath);
+    const npmProvider = new NpmDependenciesProvider();
     vscode.window.registerTreeDataProvider('modulistView', npmProvider);
-    // package.jsonの変更を監視して自動リフレッシュ
-    if (rootPath) {
-        const watcher = vscode.workspace.createFileSystemWatcher(new vscode.RelativePattern(rootPath, 'package.json'));
-        watcher.onDidChange(() => npmProvider.refresh());
-        watcher.onDidCreate(() => npmProvider.refresh());
-        watcher.onDidDelete(() => npmProvider.refresh());
-        context.subscriptions.push(watcher);
-    }
-    // ★ 新設: どこからでも呼び出せる「出力パネルに詳細情報を表示」するコマンド
+    // ワークスペース内のすべての package.json の変更を監視
+    const watcher = vscode.workspace.createFileSystemWatcher('**/package.json');
+    watcher.onDidChange(() => npmProvider.refresh());
+    watcher.onDidCreate(() => npmProvider.refresh());
+    watcher.onDidDelete(() => npmProvider.refresh());
+    context.subscriptions.push(watcher);
     vscode.commands.registerCommand('modulist.showInfoOutput', async (target) => {
-        // ツリーのホバー等から呼ばれた場合は Dependency オブジェクト、QuickPickから呼ばれた場合は文字列になる
         const pkgName = typeof target === 'string' ? target : target.label;
         if (!pkgName)
             return;
@@ -75,82 +67,90 @@ function activate(context) {
             outputChannel.appendLine(`🔗 Publisher   : ${data.author?.name || 'Unknown'}`);
             outputChannel.appendLine(`🌐 NPM Site    : https://www.npmjs.com/package/${pkgName}`);
             const repoUrl = data.repository?.url?.replace(/^git\+/, '').replace(/\.git$/, '');
-            if (repoUrl) {
+            if (repoUrl)
                 outputChannel.appendLine(`💻 Repository  : ${repoUrl}`);
-            }
-            if (data.homepage) {
+            if (data.homepage)
                 outputChannel.appendLine(`🏠 Homepage    : ${data.homepage}`);
-            }
             outputChannel.show(true);
         }
         catch (_error) {
             vscode.window.showErrorMessage(`'${pkgName}' の詳細情報の取得に失敗しました。`);
         }
     });
-    // コマンドの登録 (すべて modulist.* に変更)
-    context.subscriptions.push(vscode.commands.registerCommand('modulist.refresh', () => npmProvider.refresh()), 
-    // インストール済みパッケージの検索とアクション
-    vscode.commands.registerCommand('modulist.searchLocal', async () => {
-        if (!rootPath) {
-            vscode.window.showErrorMessage((0, i18n_1.t)('error.noWorkspace'));
-            return;
-        }
+    context.subscriptions.push(vscode.commands.registerCommand('modulist.refresh', () => npmProvider.refresh()), vscode.commands.registerCommand('modulist.searchLocal', async () => {
         try {
-            const packageJsonUri = vscode.Uri.joinPath(rootPath, 'package.json');
-            const fileData = await vscode.workspace.fs.readFile(packageJsonUri);
-            const packageJson = JSON.parse(new TextDecoder().decode(fileData));
-            const allDeps = { ...packageJson.dependencies, ...packageJson.devDependencies };
-            const items = Object.keys(allDeps).map((name) => ({
-                label: name,
-                description: allDeps[name],
-                iconPath: new vscode.ThemeIcon('package'),
-            }));
+            const packageJsons = await vscode.workspace.findFiles('**/package.json', '**/node_modules/**');
+            if (packageJsons.length === 0) {
+                return vscode.window.showErrorMessage((0, i18n_1.t)('error.noWorkspace'));
+            }
+            const items = [];
+            for (const uri of packageJsons) {
+                const fileData = await vscode.workspace.fs.readFile(uri);
+                const packageJson = JSON.parse(new TextDecoder().decode(fileData));
+                const allDeps = { ...packageJson.dependencies, ...packageJson.devDependencies };
+                const projectName = path.basename(path.dirname(uri.fsPath)) || 'Root';
+                for (const name of Object.keys(allDeps)) {
+                    items.push({
+                        label: name,
+                        description: `v${allDeps[name]} (${projectName})`,
+                        iconPath: new vscode.ThemeIcon('package'),
+                        fsPath: path.dirname(uri.fsPath),
+                    });
+                }
+            }
             const selectedPkg = await vscode.window.showQuickPick(items, {
                 placeHolder: (0, i18n_1.t)('placeholder.searchLocal'),
             });
-            if (!selectedPkg) {
+            if (!selectedPkg)
                 return;
-            }
-            const latestVersion = npmProvider.getOutdatedVersion(selectedPkg.label);
+            const latestVersion = npmProvider.getOutdatedVersion(selectedPkg.fsPath, selectedPkg.label);
             const actionOptions = [
                 { label: `$(info) ${(0, i18n_1.t)('action.openNpm')}`, id: 'open' },
                 { label: `$(output) ${(0, i18n_1.t)('action.showInfo')}`, id: 'info' },
             ];
-            if (latestVersion) {
-                // 最新バージョンが存在する（＝古い）場合のみ、アップデートボタンを追加
+            if (latestVersion)
                 actionOptions.push({ label: `$(sync) ${(0, i18n_1.t)('action.update')}`, id: 'update' });
-            }
             actionOptions.push({ label: `$(trash) ${(0, i18n_1.t)('action.remove')}`, id: 'remove' });
             actionOptions.push({ label: `$(circle-slash) ${(0, i18n_1.t)('action.cancel')}`, id: 'cancel' });
             const action = await vscode.window.showQuickPick(actionOptions, {
                 placeHolder: `${(0, i18n_1.t)('placeholder.selectAction')} ${selectedPkg.label}`,
             });
-            if (action?.id === 'open') {
+            if (action?.id === 'open')
                 vscode.env.openExternal(vscode.Uri.parse(`https://www.npmjs.com/package/${selectedPkg.label}`));
-            }
+            if (action?.id === 'info')
+                vscode.commands.executeCommand('modulist.showInfoOutput', selectedPkg.label);
             if (action?.id === 'update') {
-                const answer = await vscode.window.showInformationMessage((0, i18n_1.t)('prompt.confirmUpdate', selectedPkg.label, latestVersion || '?'), { modal: false }, (0, i18n_1.t)('btn.update'));
-                if (answer === (0, i18n_1.t)('btn.update')) {
-                    runTerminalCommand(`pnpm update ${selectedPkg.label}`);
-                }
+                const answer = await vscode.window.showInformationMessage((0, i18n_1.t)('prompt.confirmUpdate', selectedPkg.label, latestVersion || '最新'), { modal: false }, (0, i18n_1.t)('btn.update'));
+                if (answer === (0, i18n_1.t)('btn.update'))
+                    runTerminalCommand(`pnpm update ${selectedPkg.label}`, selectedPkg.fsPath);
             }
             if (action?.id === 'remove') {
                 const answer = await vscode.window.showWarningMessage(`${(0, i18n_1.t)('prompt.confirmRemove')} '${selectedPkg.label}'?`, { modal: true }, (0, i18n_1.t)('btn.remove'));
-                if (answer === (0, i18n_1.t)('btn.remove')) {
-                    runTerminalCommand(`pnpm remove ${selectedPkg.label}`);
-                }
-            }
-            if (action?.id === 'info') {
-                // ★ 共通のコマンドを呼び出すように変更
-                vscode.commands.executeCommand('modulist.showInfoOutput', selectedPkg.label);
+                if (answer === (0, i18n_1.t)('btn.remove'))
+                    runTerminalCommand(`pnpm remove ${selectedPkg.label}`, selectedPkg.fsPath);
             }
         }
         catch (_e) {
-            vscode.window.showErrorMessage('package.json を読み込めませんでした。');
+            vscode.window.showErrorMessage('package.json の読み込み中にエラーが発生しました。');
         }
-    }), 
-    // NPM検索 ＆ アクション選択 (複数選択対応)
-    vscode.commands.registerCommand('modulist.searchNpmAndAction', async () => {
+    }), vscode.commands.registerCommand('modulist.searchNpmAndAction', async () => {
+        const packageJsons = await vscode.workspace.findFiles('**/package.json', '**/node_modules/**');
+        if (packageJsons.length === 0)
+            return vscode.window.showErrorMessage((0, i18n_1.t)('error.noWorkspace'));
+        let targetFsPath = path.dirname(packageJsons[0].fsPath);
+        if (packageJsons.length > 1) {
+            const projectItems = packageJsons.map((uri) => ({
+                label: path.basename(path.dirname(uri.fsPath)) || 'Root',
+                description: uri.fsPath,
+                fsPath: path.dirname(uri.fsPath),
+            }));
+            const selectedProject = await vscode.window.showQuickPick(projectItems, {
+                placeHolder: 'インストール先のプロジェクトを選択してください',
+            });
+            if (!selectedProject)
+                return;
+            targetFsPath = selectedProject.fsPath;
+        }
         const query = await vscode.window.showInputBox({
             prompt: (0, i18n_1.t)('prompt.searchNpm'),
             placeHolder: (0, i18n_1.t)('placeholder.searchNpm'),
@@ -159,10 +159,8 @@ function activate(context) {
             return;
         const res = await fetch(`https://registry.npmjs.org/-/v1/search?text=${encodeURIComponent(query)}&size=20`);
         const data = (await res.json());
-        if (!data.objects || data.objects.length === 0) {
-            vscode.window.showInformationMessage((0, i18n_1.t)('info.notFound'));
-            return;
-        }
+        if (!data.objects || data.objects.length === 0)
+            return vscode.window.showInformationMessage((0, i18n_1.t)('info.notFound'));
         const items = data.objects.map((obj) => ({
             label: obj.package.name,
             description: `v${obj.package.version}`,
@@ -192,130 +190,185 @@ function activate(context) {
         const action = await vscode.window.showQuickPick(actionOptions, {
             placeHolder: actionPlaceHolder,
         });
-        if (!action) {
+        if (!action)
             return;
-        }
         switch (action.id) {
             case 'add':
             case 'addDev': {
                 const isDev = action.id === 'addDev';
-                const depType = isDev ? (0, i18n_1.t)('label.devDep') : (0, i18n_1.t)('label.dep');
-                const answer = await vscode.window.showInformationMessage((0, i18n_1.t)('prompt.confirmInstall', pkgNames, depType), { modal: false }, (0, i18n_1.t)('btn.install'));
-                if (answer === (0, i18n_1.t)('btn.install')) {
-                    runTerminalCommand(isDev ? `pnpm add -D ${pkgNames}` : `pnpm add ${pkgNames}`);
-                }
+                const answer = await vscode.window.showInformationMessage((0, i18n_1.t)('prompt.confirmInstall', pkgNames, isDev ? (0, i18n_1.t)('label.devDep') : (0, i18n_1.t)('label.dep')), { modal: false }, (0, i18n_1.t)('btn.install'));
+                if (answer === (0, i18n_1.t)('btn.install'))
+                    runTerminalCommand(isDev ? `pnpm add -D ${pkgNames}` : `pnpm add ${pkgNames}`, targetFsPath);
                 break;
             }
             case 'open':
                 vscode.env.openExternal(vscode.Uri.parse(`https://www.npmjs.com/package/${pkgNames}`));
                 break;
-            case 'info': {
-                // ★ 共通のコマンドを呼び出すように変更
+            case 'info':
                 vscode.commands.executeCommand('modulist.showInfoOutput', pkgNames);
                 break;
-            }
         }
-    }), 
-    // 「追加」ボタンからのルーティング
-    vscode.commands.registerCommand('modulist.add', () => {
-        vscode.commands.executeCommand('modulist.searchNpmAndAction');
-    }), 
-    // リストからの各種操作
-    vscode.commands.registerCommand('modulist.openInfo', (item) => {
-        vscode.env.openExternal(vscode.Uri.parse(`https://www.npmjs.com/package/${item.label}`));
-    }), vscode.commands.registerCommand('modulist.update', async (item) => {
-        const latestVersion = npmProvider.getOutdatedVersion(item.label) || '最新';
+    }), vscode.commands.registerCommand('modulist.add', () => vscode.commands.executeCommand('modulist.searchNpmAndAction')), vscode.commands.registerCommand('modulist.openInfo', (item) => vscode.env.openExternal(vscode.Uri.parse(`https://www.npmjs.com/package/${item.label}`))), vscode.commands.registerCommand('modulist.update', async (item) => {
+        // ★ 変更: 早期リターンで undefined を排除
+        if (!item.fsPath)
+            return;
+        const latestVersion = npmProvider.getOutdatedVersion(item.fsPath, item.label) || '最新';
         const answer = await vscode.window.showInformationMessage((0, i18n_1.t)('prompt.confirmUpdate', item.label, latestVersion), { modal: false }, (0, i18n_1.t)('btn.update'));
-        if (answer === (0, i18n_1.t)('btn.update')) {
-            runTerminalCommand(`pnpm update ${item.label}`);
-        }
+        if (answer === (0, i18n_1.t)('btn.update'))
+            runTerminalCommand(`pnpm update ${item.label}`, item.fsPath);
     }), vscode.commands.registerCommand('modulist.remove', async (item) => {
-        const answer = await vscode.window.showWarningMessage((0, i18n_1.t)('prompt.confirmRemove', item.label), { modal: true }, (0, i18n_1.t)('btn.remove'));
-        if (answer === (0, i18n_1.t)('btn.remove')) {
-            runTerminalCommand(`pnpm remove ${item.label}`);
-        }
+        // ★ 変更: 早期リターンで undefined を排除
+        if (!item.fsPath)
+            return;
+        const answer = await vscode.window.showWarningMessage(`${(0, i18n_1.t)('prompt.confirmRemove')} '${item.label}' ?`, { modal: true }, (0, i18n_1.t)('btn.remove'));
+        if (answer === (0, i18n_1.t)('btn.remove'))
+            runTerminalCommand(`pnpm remove ${item.label}`, item.fsPath);
     }));
-}
-// ターミナルを実行する関数
-function runTerminalCommand(command) {
-    const termName = 'Modulist'; // ターミナル名も変更
-    let terminal = vscode.window.terminals.find((t) => t.name === termName);
-    if (!terminal) {
-        terminal = vscode.window.createTerminal(termName);
-    }
-    terminal.show();
-    terminal.sendText(command);
-}
-// TreeDataProviderの実装
-class NpmDependenciesProvider {
-    workspaceRoot;
-    _onDidChangeTreeData = new vscode.EventEmitter();
-    onDidChangeTreeData = this._onDidChangeTreeData.event;
-    // ★ 新設: アウトデイト（古い）パッケージのリストを保持
-    outdatedDeps = new Map();
-    constructor(workspaceRoot) {
-        this.workspaceRoot = workspaceRoot;
-        this.checkOutdatedPackages();
-    }
-    getOutdatedVersion(pkgName) {
-        return this.outdatedDeps.get(pkgName);
-    }
-    refresh() {
-        // 1. まずローカルの package.json だけで即座にツリーを再描画
-        this._onDidChangeTreeData.fire(undefined);
-        // 2. 裏で非同期にアップデート確認を走らせ、完了したらUIを更新
-        this.checkOutdatedPackages();
-    }
-    // ★ 新設: pnpm outdated を実行して古いパッケージを特定する
-    async checkOutdatedPackages() {
-        if (!this.workspaceRoot)
+    // ① スクリプトの実行
+    vscode.commands.registerCommand('modulist.runScript', (item) => {
+        // ★ 変更: 早期リターンで undefined を排除
+        if (!item.fsPath)
+            return;
+        runTerminalCommand(`pnpm run ${item.label}`, item.fsPath);
+    });
+    // ② 一括アップデート
+    vscode.commands.registerCommand('modulist.updateAll', async (item) => {
+        // ★ 変更: 早期リターンで undefined を排除
+        if (!item.fsPath)
             return;
         try {
-            // pnpm outdated --json をワークスペース内で実行
-            const { stdout } = await exec('pnpm outdated --json', {
-                cwd: this.workspaceRoot.fsPath,
-                maxBuffer: 1024 * 1024 * 5, // 万が一出力が多い時のためのバッファ
-            });
-            const data = JSON.parse(stdout);
-            this.outdatedDeps.clear();
-            for (const key of Object.keys(data)) {
-                this.outdatedDeps.set(key, data[key].latest); // ★ latestバージョンを保存
+            const packageJsonUri = vscode.Uri.file(path.join(item.fsPath, 'package.json'));
+            const fileData = await vscode.workspace.fs.readFile(packageJsonUri);
+            const packageJson = JSON.parse(new TextDecoder().decode(fileData));
+            const isDev = item.contextValue === 'category-devDep';
+            const deps = isDev ? packageJson.devDependencies : packageJson.dependencies;
+            if (!deps)
+                return;
+            // 古いパッケージだけを抽出
+            const outdatedPkgs = Object.keys(deps).filter((dep) => npmProvider.getOutdatedVersion(item.fsPath, dep));
+            if (outdatedPkgs.length === 0) {
+                return vscode.window.showInformationMessage('アップデート可能なパッケージはありません。');
+            }
+            const answer = await vscode.window.showInformationMessage((0, i18n_1.t)('prompt.confirmUpdateAll', item.label), { modal: false }, (0, i18n_1.t)('btn.update'));
+            if (answer === (0, i18n_1.t)('btn.update')) {
+                runTerminalCommand(`pnpm update ${outdatedPkgs.join(' ')}`, item.fsPath);
             }
         }
-        catch (error) {
-            // pnpm outdated はアップデートがあると終了コード 1 になるため catch に入る
-            const err = error;
-            if (err.stdout) {
-                try {
-                    const data = JSON.parse(err.stdout);
-                    this.outdatedDeps.clear();
-                    for (const key of Object.keys(data)) {
-                        this.outdatedDeps.set(key, data[key].latest); // ★ latestバージョンを保存
+        catch (_e) {
+            vscode.window.showErrorMessage('一括アップデートに失敗しました。');
+        }
+    });
+    // ③ 未使用パッケージの検出 (プログレスバー付き)
+    vscode.commands.registerCommand('modulist.scanUnused', async (item) => {
+        // ★ 変更: 早期リターンで undefined を排除
+        if (!item.fsPath)
+            return;
+        vscode.window.withProgress({
+            location: vscode.ProgressLocation.Notification,
+            title: (0, i18n_1.t)('prompt.scanningUnused'),
+            cancellable: false,
+        }, async () => {
+            try {
+                const { stdout } = await exec('npx depcheck --json', { cwd: item.fsPath });
+                processDepcheckResult(stdout, item.fsPath);
+            }
+            catch (error) {
+                const err = error;
+                if (err.stdout) {
+                    processDepcheckResult(err.stdout, item.fsPath);
+                }
+                else {
+                    vscode.window.showErrorMessage('スキャンに失敗しました。npxコマンドが使用可能か確認してください。');
+                }
+            }
+        });
+    });
+}
+function runTerminalCommand(command, cwd) {
+    const termName = 'Modulist';
+    let terminal = vscode.window.terminals.find((t) => t.name === termName);
+    if (!terminal)
+        terminal = vscode.window.createTerminal(termName);
+    terminal.show();
+    if (cwd) {
+        terminal.sendText(`cd "${cwd}"`);
+    }
+    terminal.sendText(command);
+}
+async function processDepcheckResult(stdout, fsPath) {
+    try {
+        const result = JSON.parse(stdout);
+        const unused = [...(result.dependencies || []), ...(result.devDependencies || [])];
+        if (unused.length === 0) {
+            vscode.window.showInformationMessage((0, i18n_1.t)('info.noUnused'));
+            return;
+        }
+        const answer = await vscode.window.showWarningMessage(`${(0, i18n_1.t)('prompt.confirmRemoveUnused', unused.length.toString())}\n\n${unused.join('\n')}`, { modal: true }, (0, i18n_1.t)('btn.remove'));
+        if (answer === (0, i18n_1.t)('btn.remove')) {
+            runTerminalCommand(`pnpm remove ${unused.join(' ')}`, fsPath);
+        }
+    }
+    catch (_e) {
+        vscode.window.showErrorMessage('スキャン結果の解析に失敗しました。');
+    }
+}
+class NpmDependenciesProvider {
+    _onDidChangeTreeData = new vscode.EventEmitter();
+    onDidChangeTreeData = this._onDidChangeTreeData.event;
+    outdatedDeps = new Map();
+    constructor() {
+        this.checkOutdatedPackages();
+    }
+    getOutdatedVersion(fsPath, pkgName) {
+        return this.outdatedDeps.get(`${fsPath}:${pkgName}`);
+    }
+    refresh() {
+        this._onDidChangeTreeData.fire(undefined);
+        this.checkOutdatedPackages();
+    }
+    async checkOutdatedPackages() {
+        const packageJsons = await vscode.workspace.findFiles('**/package.json', '**/node_modules/**');
+        this.outdatedDeps.clear();
+        for (const uri of packageJsons) {
+            const dirPath = path.dirname(uri.fsPath);
+            try {
+                const { stdout } = await exec('pnpm outdated --json', {
+                    cwd: dirPath,
+                    maxBuffer: 1024 * 1024 * 5,
+                });
+                const data = JSON.parse(stdout);
+                for (const key of Object.keys(data))
+                    this.outdatedDeps.set(`${dirPath}:${key}`, data[key].latest);
+            }
+            catch (error) {
+                const err = error;
+                if (err.stdout) {
+                    try {
+                        const data = JSON.parse(err.stdout);
+                        for (const key of Object.keys(data))
+                            this.outdatedDeps.set(`${dirPath}:${key}`, data[key].latest);
+                    }
+                    catch (_e) {
+                        /* ignore parse error */
                     }
                 }
-                catch (_e) {
-                    this.outdatedDeps.clear();
-                }
-            }
-            else {
-                this.outdatedDeps.clear();
             }
         }
-        // 古いパッケージのリストが完成したら、もう一度ツリーを再描画（アップデートボタンが出現）
         this._onDidChangeTreeData.fire(undefined);
     }
     getTreeItem(element) {
         return element;
     }
     async resolveTreeItem(item, element, _token) {
-        if (element.contextValue === 'category') {
+        if (element.contextValue === 'project' ||
+            element.contextValue.startsWith('category') ||
+            element.contextValue === 'script') {
             return item;
         }
         try {
             const response = await fetch(`https://registry.npmjs.org/${element.label}`);
             const downloadResponse = await fetch(`https://api.npmjs.org/downloads/point/last-week/${element.label}`);
-            const rawData = await response.json();
-            const data = rawData;
+            const data = (await response.json());
             const downloadData = (await downloadResponse.json());
             const description = data.description || '説明文なし';
             const latestVersion = data['dist-tags']?.latest || '不明';
@@ -341,76 +394,96 @@ class NpmDependenciesProvider {
             return item;
         }
         catch (_error) {
-            const fallbackTooltip = new vscode.MarkdownString(`**${element.label}**\n\n情報の取得に失敗しました。`);
-            item.tooltip = fallbackTooltip;
+            item.tooltip = new vscode.MarkdownString(`**${element.label}**\n\n情報の取得に失敗しました。`);
             return item;
         }
     }
     async getChildren(element) {
-        if (!this.workspaceRoot) {
-            vscode.window.showInformationMessage('No workspace found');
-            return Promise.resolve([]);
+        if (!element) {
+            const packageJsons = await vscode.workspace.findFiles('**/package.json', '**/node_modules/**');
+            if (packageJsons.length === 0)
+                return [];
+            return packageJsons.map((uri) => {
+                const dirPath = path.dirname(uri.fsPath);
+                const projectName = path.basename(dirPath) || 'Root';
+                return new ModulistItem(projectName, vscode.TreeItemCollapsibleState.Expanded, 'project', dirPath);
+            });
         }
-        const packageJsonUri = vscode.Uri.joinPath(this.workspaceRoot, 'package.json');
-        if (element) {
+        else if (element.contextValue === 'project') {
+            return [
+                new ModulistItem((0, i18n_1.t)('label.scripts'), vscode.TreeItemCollapsibleState.Expanded, 'category-script', element.fsPath),
+                new ModulistItem((0, i18n_1.t)('label.dep'), vscode.TreeItemCollapsibleState.Expanded, 'category-dep', element.fsPath),
+                new ModulistItem((0, i18n_1.t)('label.devDep'), vscode.TreeItemCollapsibleState.Expanded, 'category-devDep', element.fsPath),
+            ];
+        }
+        else if (element.contextValue.startsWith('category')) {
+            // ★ 変更: 早期リターンで undefined を排除
+            if (!element.fsPath)
+                return [];
             try {
+                const packageJsonUri = vscode.Uri.file(path.join(element.fsPath, 'package.json'));
                 const fileData = await vscode.workspace.fs.readFile(packageJsonUri);
                 const packageJson = JSON.parse(new TextDecoder().decode(fileData));
-                // ★ 変更: 翻訳されたラベルを使って判定する
-                const isDev = element.label === (0, i18n_1.t)('label.devDep');
-                const deps = isDev ? packageJson.devDependencies : packageJson.dependencies;
-                if (!deps)
-                    return [];
-                return Object.keys(deps).map((depName) => {
-                    const isOutdated = this.outdatedDeps.has(depName);
-                    return new Dependency(depName, deps[depName], vscode.TreeItemCollapsibleState.None, isOutdated ? 'dependency-outdated' : 'dependency', isDev);
-                });
+                if (element.contextValue === 'category-script') {
+                    const scripts = packageJson.scripts;
+                    if (!scripts)
+                        return [];
+                    return Object.keys(scripts).map((scriptName) => new ModulistItem(scriptName, vscode.TreeItemCollapsibleState.None, 'script', element.fsPath, scripts[scriptName]));
+                }
+                else {
+                    const isDev = element.contextValue === 'category-devDep';
+                    const deps = isDev ? packageJson.devDependencies : packageJson.dependencies;
+                    if (!deps)
+                        return [];
+                    return Object.keys(deps).map((depName) => {
+                        const isOutdated = this.outdatedDeps.has(`${element.fsPath}:${depName}`);
+                        return new ModulistItem(depName, vscode.TreeItemCollapsibleState.None, isOutdated ? 'dependency-outdated' : 'dependency', element.fsPath, deps[depName], isDev);
+                    });
+                }
             }
             catch (_e) {
                 return [];
             }
         }
-        else {
-            // ★ 変更: カテゴリの表示名に i18n の t() 関数を適用
-            return [
-                new Dependency((0, i18n_1.t)('label.dep'), '', vscode.TreeItemCollapsibleState.Expanded, 'category'),
-                new Dependency((0, i18n_1.t)('label.devDep'), '', vscode.TreeItemCollapsibleState.Expanded, 'category'),
-            ];
-        }
+        return [];
     }
 }
-// ツリーに表示するアイテムの定義
-class Dependency extends vscode.TreeItem {
+class ModulistItem extends vscode.TreeItem {
     label;
-    version;
     collapsibleState;
     contextValue;
+    fsPath;
+    version;
     isDev;
-    constructor(label, version, collapsibleState, contextValue, isDev = false) {
+    constructor(label, collapsibleState, contextValue, fsPath, version, isDev = false) {
         super(label, collapsibleState);
         this.label = label;
-        this.version = version;
         this.collapsibleState = collapsibleState;
         this.contextValue = contextValue;
+        this.fsPath = fsPath;
+        this.version = version;
         this.isDev = isDev;
-        this.description = this.version;
-        // ★ 変更: contextValue と isDev フラグによってアイコンの色を切り替える
-        if (this.contextValue === 'category') {
+        if (this.version)
+            this.description = this.version;
+        if (this.contextValue === 'project') {
+            this.iconPath = new vscode.ThemeIcon('folder-library');
+        }
+        else if (this.contextValue.startsWith('category')) {
             this.iconPath = new vscode.ThemeIcon('symbol-class');
         }
+        else if (this.contextValue === 'script') {
+            this.iconPath = new vscode.ThemeIcon('terminal');
+        }
         else if (this.contextValue === 'dependency-outdated') {
-            // アップデートあり: 警告色（黄色/オレンジ）
             this.iconPath = new vscode.ThemeIcon('package', new vscode.ThemeColor('list.warningForeground'));
         }
         else if (this.isDev) {
-            // Dev Dependencies: 通常のキーワード色（青/グレーなど）
             this.iconPath = new vscode.ThemeIcon('package', new vscode.ThemeColor('problemsInfoIcon.foreground'));
         }
         else {
-            // Dependencies: 緑色（テスト成功時の緑色を利用）
             this.iconPath = new vscode.ThemeIcon('package', new vscode.ThemeColor('testing.iconPassed'));
         }
-        if (this.contextValue !== 'category') {
+        if (this.contextValue.startsWith('dependency')) {
             this.command = {
                 title: 'Open NPM Package Info',
                 command: 'modulist.openInfo',

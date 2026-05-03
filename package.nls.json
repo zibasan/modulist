@@ -8,5 +8,8 @@
   "command.searchLocal": "Modulist: Search Installed Packages",
   "command.searchNpmAndAction": "Modulist: Search & Actions",
   "command.focusView": "Modulist: Focus on Package List",
-  "command.showInfoOutput": "Show Details in Output Panel"
+  "command.showInfoOutput": "Show Details in Output Panel",
+  "action.runScript": "Run Script",
+  "action.updateAll": "Update All Outdated",
+  "action.scanUnused": "Scan Unused Packages"
 }
