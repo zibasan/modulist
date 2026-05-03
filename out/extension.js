@@ -36,6 +36,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.activate = activate;
 exports.deactivate = deactivate;
 const vscode = __importStar(require("vscode"));
+const functions_1 = require("./utils/functions");
 function activate(context) {
     const rootPath = vscode.workspace.workspaceFolders && vscode.workspace.workspaceFolders.length > 0
         ? vscode.workspace.workspaceFolders[0].uri
@@ -70,9 +71,7 @@ function runTerminalCommand(command) {
     terminal.show();
     terminal.sendText(command);
 }
-// ---------------------------------------------------------
 // TreeDataProviderの実装（VS Codeのサイドバーにデータを渡すクラス）
-// ---------------------------------------------------------
 class NpmDependenciesProvider {
     workspaceRoot;
     _onDidChangeTreeData = new vscode.EventEmitter();
@@ -85,6 +84,53 @@ class NpmDependenciesProvider {
     }
     getTreeItem(element) {
         return element;
+    }
+    async resolveTreeItem(item, element, _token) {
+        // カテゴリー（Dependenciesというフォルダ部分）の場合は何もしない
+        if (element.contextValue === 'category') {
+            return item;
+        }
+        try {
+            // NPMの公式APIから、そのパッケージの情報を取得
+            const response = await fetch(`https://registry.npmjs.org/${element.label}`);
+            const downloadResponse = await fetch(`https://api.npmjs.org/downloads/point/last-week/${element.label}`);
+            const rawData = await response.json();
+            const data = rawData;
+            const downloadData = (await downloadResponse.json());
+            // 取得したデータの中から必要な情報を抜き出す
+            const description = data.description || '説明文なし';
+            const latestVersion = data['dist-tags']?.latest || '不明';
+            const license = data.license || 'ライセンス不明';
+            const author = data.author?.name || '作成者不明';
+            const readme = (0, functions_1.createReadmeText)(data.readme) || '';
+            const homepage = data.homepage || '*ホームページがありません*';
+            const repoUrl = data.repository?.url?.replace(/^git\+/, '').replace(/\.git$/, '') || 'リポジトリ情報不明';
+            const downloads = downloadData.downloads || '?';
+            // MarkdownStringを作って、情報を埋め込んでいく
+            const tooltip = new vscode.MarkdownString('', true);
+            tooltip.supportThemeIcons = true;
+            // タイトルと、現在インストールされているバージョン
+            tooltip.appendMarkdown(`### ${element.label} \`${element.version}\`\n\n`);
+            tooltip.appendMarkdown(`$(info) Latest: **\`${latestVersion}\`** | $(law) \`${license}\` | $(cloud-download) 週間ダウンロード数: **${downloads}**\n\n`);
+            // 作者と説明文を埋め込む
+            tooltip.appendMarkdown(`$(accounts-view-bar-icon) 制作者: **${author}**\n\n`);
+            tooltip.appendMarkdown(`$(info) 説明: *\`${description}\`*\n\n`);
+            tooltip.appendMarkdown(`$(link-external) ホームページ: [開く](${homepage})\n\n`);
+            tooltip.appendMarkdown(`$(mark-github) リポジトリ: [開く](${repoUrl})\n\n`);
+            tooltip.appendMarkdown(`---\n\n`);
+            tooltip.appendMarkdown(`[$(link-external) NPMで詳細を確認する](https://www.npmjs.com/package/${element.label})\n\n`);
+            tooltip.appendMarkdown(`---\n\n`);
+            tooltip.appendMarkdown(`${readme}\n\n`);
+            // 作成したツールチップをセットして返す
+            item.tooltip = tooltip;
+            return item;
+        }
+        catch (_error) {
+            // オフライン時やエラー時はシンプルなツールチップを返す
+            const fallbackTooltip = new vscode.MarkdownString(`**${element.label}**\n\n情報の取得に失敗しました。`);
+            item.tooltip = fallbackTooltip;
+            return item;
+        }
     }
     async getChildren(element) {
         if (!this.workspaceRoot) {
@@ -129,13 +175,17 @@ class Dependency extends vscode.TreeItem {
         this.version = version;
         this.collapsibleState = collapsibleState;
         this.contextValue = contextValue;
-        this.tooltip = `${this.label}-${this.version}`;
         this.description = this.version; // パッケージ名の右側に薄い文字でバージョンを表示
         // アイコンの設定
         this.iconPath =
             this.contextValue === 'category'
                 ? new vscode.ThemeIcon('symbol-class')
-                : new vscode.ThemeIcon('package');
+                : new vscode.ThemeIcon('package', new vscode.ThemeColor('symbolIcon.keywordForeground'));
+        this.command = {
+            title: 'Open NPM Package Info',
+            command: 'manageNpmPkg.openInfo',
+            arguments: [this],
+        };
     }
 }
 function deactivate() { }
