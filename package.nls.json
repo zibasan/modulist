@@ -1,0 +1,12 @@
+{
+  "view.name": "Modulist - NPM Packages",
+  "command.refresh": "Modulist: Refresh",
+  "command.add": "Modulist: Add Package",
+  "command.remove": "Modulist: Remove Package",
+  "command.update": "Modulist: Update Package",
+  "command.openInfo": "Modulist: Open on npm",
+  "command.searchLocal": "Modulist: Search Installed Packages",
+  "command.searchNpmAndAction": "Modulist: Search & Actions",
+  "command.focusView": "Modulist: Focus on Package List",
+  "command.showInfoOutput": "Show Details in Output Panel"
+}

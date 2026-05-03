@@ -1,0 +1,12 @@
+{
+  "view.name": "Modulist - NPM Packages",
+  "command.refresh": "Modulist: 更新",
+  "command.add": "Modulist: パッケージを追加",
+  "command.remove": "Modulist: パッケージを削除",
+  "command.update": "Modulist: パッケージをアップデート",
+  "command.openInfo": "Modulist: npmで確認する",
+  "command.searchLocal": "Modulist: インストール済みパッケージを検索",
+  "command.searchNpmAndAction": "Modulist: パッケージを検索してアクションを選択",
+  "command.focusView": "Modulist: パッケージ一覧を開く",
+  "command.showInfoOutput": "Modulist: 出力パネルで詳細を表示"
+}

@@ -1,6 +1,6 @@
 {
-  "name": "manage-npm-pkg",
-  "displayName": "manage-npm-pkg",
+  "name": "modulist",
+  "displayName": "modulist",
   "description": "A VS Code extension for managing npm packages.",
   "version": "0.0.1",
   "engines": {
@@ -15,83 +15,45 @@
     "views": {
       "explorer": [
         {
-          "id": "manageNpmPkgView",
-          "name": "NPM Packages",
+          "id": "modulistView",
+          "name": "%view.name%",
           "icon": ""
         }
       ]
     },
     "commands": [
-      {
-        "command": "manageNpmPkg.refresh",
-        "title": "Refresh",
-        "icon": "$(refresh)"
-      },
-      {
-        "command": "manageNpmPkg.add",
-        "title": "Add Package",
-        "icon": "$(add)"
-      },
-      {
-        "command": "manageNpmPkg.openInfo",
-        "title": "Open on npm",
-        "icon": "$(info)"
-      },
-      {
-        "command": "manageNpmPkg.update",
-        "title": "Update Package",
-        "icon": "$(sync)"
-      },
-      {
-        "command": "manageNpmPkg.remove",
-        "title": "Remove Package",
-        "icon": "$(trash)"
-      }
+      { "command": "modulist.refresh", "title": "%command.refresh%", "icon": "$(refresh)" },
+      { "command": "modulist.add", "title": "%command.add%", "icon": "$(add)" },
+      { "command": "modulist.openInfo", "title": "%command.openInfo%", "icon": "$(globe)" },
+      { "command": "modulist.showInfoOutput", "title": "%command.showInfoOutput%", "icon": "$(output)" },
+      { "command": "modulist.update", "title": "%command.update%", "icon": "$(sync)" },
+      { "command": "modulist.remove", "title": "%command.remove%", "icon": "$(trash)" },
+      { "command": "modulist.searchLocal", "title": "%command.searchLocal%", "icon": "$(search)" },
+      { "command": "modulist.searchNpmAndAction", "title": "%command.searchNpmAndAction%" },
+      { "command": "modulistView.focus", "title": "%command.focusView%" }
     ],
     "menus": {
+      "commandPalette": [
+        { "command": "modulist.openInfo", "when": "false" },
+        { "command": "modulist.update", "when": "false" },
+        { "command": "modulist.remove", "when": "false" },
+        { "command": "modulist.showInfoOutput", "when": "false" }
+      ],
       "view/title": [
-        {
-          "command": "manageNpmPkg.add",
-          "when": "view == manageNpmPkgView",
-          "group": "navigation"
-        },
-        {
-          "command": "manageNpmPkg.refresh",
-          "when": "view == manageNpmPkgView",
-          "group": "navigation"
-        }
+        { "command": "modulist.add", "when": "view == modulistView", "group": "navigation@1" },
+        { "command": "modulist.searchLocal", "when": "view == modulistView", "group": "navigation@2" },
+        { "command": "modulist.refresh", "when": "view == modulistView", "group": "navigation@3" }
       ],
       "view/item/context": [
-        {
-          "command": "manageNpmPkg.openInfo",
-          "when": "view == manageNpmPkgView && viewItem == dependency",
-          "group": "inline"
-        },
-        {
-          "command": "manageNpmPkg.update",
-          "when": "view == manageNpmPkgView && viewItem == dependency",
-          "group": "inline"
-        },
-        {
-          "command": "manageNpmPkg.remove",
-          "when": "view == manageNpmPkgView && viewItem == dependency",
-          "group": "inline"
-        },
-        {
-          "command": "manageNpmPkg.openInfo",
-          "when": "view == manageNpmPkgView && viewItem == dependency",
-          "group": "1_actions"
-        },
-        {
-          "command": "manageNpmPkg.update",
-          "when": "view == manageNpmPkgView && viewItem == dependency",
-          "group": "2_modifications"
-        },
-        {
-          "command": "manageNpmPkg.remove",
-          "when": "view == manageNpmPkgView && viewItem == dependency",
-          "group": "3_danger"
-        }
+        { "command": "modulist.showInfoOutput", "when": "view == modulistView && viewItem =~ /^dependency/", "group": "inline" },
+        { "command": "modulist.update", "when": "view == modulistView && viewItem == dependency-outdated", "group": "inline" },
+        { "command": "modulist.openInfo", "when": "view == modulistView && viewItem =~ /^dependency/", "group": "inline" },
+        { "command": "modulist.remove", "when": "view == modulistView && viewItem =~ /^dependency/", "group": "inline" },
+
+        { "command": "modulist.showInfoOutput", "when": "view == modulistView && viewItem =~ /^dependency/", "group": "1_actions@1" },
+        { "command": "modulist.openInfo", "when": "view == modulistView && viewItem =~ /^dependency/", "group": "1_actions@2" },
+        { "command": "modulist.update", "when": "view == modulistView && viewItem == dependency-outdated", "group": "2_modifications" },
+        { "command": "modulist.remove", "when": "view == modulistView && viewItem =~ /^dependency/", "group": "3_danger" }
       ]
     }
   },

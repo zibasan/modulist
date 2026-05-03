@@ -26,6 +26,20 @@ export type NpmRepoDownloadsResponse = {
   downloads: number;
 };
 
+export type NpmSearchPackage = {
+  name: string;
+  version: string;
+  description?: string;
+  publisher?: {
+    username: string;
+  };
+  links?: {
+    npm?: string;
+    repository?: string;
+    homepage?: string;
+  };
+};
+
 export type NpmSearchResponse = {
-  objects: { package: { name: string; version: string; description: string } }[];
+  objects: { package: NpmSearchPackage }[];
 };
