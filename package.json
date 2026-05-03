@@ -9,31 +9,72 @@
   "categories": [
     "Other"
   ],
-  "activationEvents": ["*"],
+  "activationEvents": [],
   "main": "./out/extension.js",
   "contributes": {
-    "commands": [
-      {
-        "command": "manage-npm-pkg.start",
-        "title": "Manage NPM Package: Start"
-      }
-    ],
     "views": {
       "explorer": [
         {
-          "type": "webview",
-          "id": "manage-npm-pkg.sidebar",
-          "name": "Manage NPM Package",
+          "id": "manageNpmPkgView",
+          "name": "NPM Packages",
           "icon": ""
+        }
+      ]
+    },
+    "commands": [
+      {
+        "command": "manageNpmPkg.refresh",
+        "title": "Refresh",
+        "icon": "$(refresh)"
+      },
+      {
+        "command": "manageNpmPkg.openInfo",
+        "title": "Open on npm",
+        "icon": "$(info)"
+      },
+      {
+        "command": "manageNpmPkg.update",
+        "title": "Update Package",
+        "icon": "$(sync)"
+      },
+      {
+        "command": "manageNpmPkg.remove",
+        "title": "Remove Package",
+        "icon": "$(trash)"
+      }
+    ],
+    "menus": {
+      "view/title": [
+        {
+          "command": "manageNpmPkg.refresh",
+          "when": "view == manageNpmPkgView",
+          "group": "navigation"
+        }
+      ],
+      "view/item/context": [
+        {
+          "command": "manageNpmPkg.openInfo",
+          "when": "view == manageNpmPkgView && viewItem == dependency",
+          "group": "inline"
+        },
+        {
+          "command": "manageNpmPkg.update",
+          "when": "view == manageNpmPkgView && viewItem == dependency",
+          "group": "inline"
+        },
+        {
+          "command": "manageNpmPkg.remove",
+          "when": "view == manageNpmPkgView && viewItem == dependency",
+          "group": "inline"
         }
       ]
     }
   },
   "scripts": {
-    "vscode:prepublish": "pnpm run compile && pnpm check",
+    "vscode:prepublish": "pnpm check && pnpm run compile",
     "compile": "tsc -p ./",
     "watch": "tsc -watch -p ./",
-    "pretest": "pnpm run compile && pnpm check@fix",
+    "pretest": "pnpm check@fix && pnpm run compile",
     "check": "pnpm biome check",
     "check@fix": "pnpm biome check --write",
     "test": "vscode-test"

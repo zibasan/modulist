@@ -37,101 +37,106 @@ exports.activate = activate;
 exports.deactivate = deactivate;
 const vscode = __importStar(require("vscode"));
 function activate(context) {
-    // 1. 【サイドバー用】プロバイダーを登録
-    const sidebarProvider = new PkgSidebarProvider(context.extensionUri);
-    context.subscriptions.push(vscode.window.registerWebviewViewProvider('manage-npm-pkg.sidebar', sidebarProvider));
-    // 2. 【エディタータブ用】コマンドを登録（既存の機能）
-    const disposable = vscode.commands.registerCommand('manage-npm-pkg.start', () => {
-        const panel = vscode.window.createWebviewPanel('manageNpmPkgPanel', 'Manage NPM Pkg', vscode.ViewColumn.One, {
-            enableScripts: true,
-            retainContextWhenHidden: true,
-            localResourceRoots: [vscode.Uri.joinPath(context.extensionUri, 'webview-ui', 'dist')],
-        });
-        // 共通のセットアップ処理を呼び出す
-        setupWebview(panel.webview, context.extensionUri);
-    });
-    context.subscriptions.push(disposable);
+    const rootPath = vscode.workspace.workspaceFolders && vscode.workspace.workspaceFolders.length > 0
+        ? vscode.workspace.workspaceFolders[0].uri
+        : undefined;
+    // ツリービューのプロバイダーを登録
+    const npmProvider = new NpmDependenciesProvider(rootPath);
+    vscode.window.registerTreeDataProvider('manageNpmPkgView', npmProvider);
+    // package.jsonの変更を監視して自動リフレッシュ
+    if (rootPath) {
+        const watcher = vscode.workspace.createFileSystemWatcher(new vscode.RelativePattern(rootPath, 'package.json'));
+        watcher.onDidChange(() => npmProvider.refresh());
+        watcher.onDidCreate(() => npmProvider.refresh());
+        watcher.onDidDelete(() => npmProvider.refresh());
+        context.subscriptions.push(watcher);
+    }
+    // コマンドの登録
+    context.subscriptions.push(vscode.commands.registerCommand('manageNpmPkg.refresh', () => npmProvider.refresh()), vscode.commands.registerCommand('manageNpmPkg.openInfo', (item) => {
+        vscode.env.openExternal(vscode.Uri.parse(`https://www.npmjs.com/package/${item.label}`));
+    }), vscode.commands.registerCommand('manageNpmPkg.update', (item) => {
+        runTerminalCommand(`pnpm update ${item.label}`);
+    }), vscode.commands.registerCommand('manageNpmPkg.remove', (item) => {
+        runTerminalCommand(`pnpm remove ${item.label}`);
+    }));
 }
-// サイドバーでWebviewを表示するためのクラス
-class PkgSidebarProvider {
-    _extensionUri;
-    constructor(_extensionUri) {
-        this._extensionUri = _extensionUri;
+// ターミナルを実行する関数
+function runTerminalCommand(command) {
+    const termName = 'Manage NPM Pkg';
+    let terminal = vscode.window.terminals.find((t) => t.name === termName);
+    if (!terminal) {
+        terminal = vscode.window.createTerminal(termName);
     }
-    resolveWebviewView(webviewView) {
-        webviewView.webview.options = {
-            enableScripts: true,
-            localResourceRoots: [vscode.Uri.joinPath(this._extensionUri, 'webview-ui', 'dist')],
-        };
-        // 共通のセットアップ処理を呼び出す
-        setupWebview(webviewView.webview, this._extensionUri);
-    }
+    terminal.show();
+    terminal.sendText(command);
 }
 // ---------------------------------------------------------
-// エディターとサイドバーで使い回す、共通のWebviewセットアップ処理
+// TreeDataProviderの実装（VS Codeのサイドバーにデータを渡すクラス）
 // ---------------------------------------------------------
-function setupWebview(webview, extensionUri) {
-    const scriptPathOnDisk = vscode.Uri.joinPath(extensionUri, 'webview-ui', 'dist', 'assets', 'index.js');
-    const stylePathOnDisk = vscode.Uri.joinPath(extensionUri, 'webview-ui', 'dist', 'assets', 'index.css');
-    const scriptUri = webview.asWebviewUri(scriptPathOnDisk);
-    const styleUri = webview.asWebviewUri(stylePathOnDisk);
-    webview.html = getWebviewContent(scriptUri, styleUri);
-    // Reactからのメッセージ受信処理
-    webview.onDidReceiveMessage(async (message) => {
-        switch (message.command) {
-            // Reactから「パッケージ情報をちょうだい」と言われたら
-            case 'getPackages':
-                await sendPackageData(webview);
-                return;
+class NpmDependenciesProvider {
+    workspaceRoot;
+    _onDidChangeTreeData = new vscode.EventEmitter();
+    onDidChangeTreeData = this._onDidChangeTreeData.event;
+    constructor(workspaceRoot) {
+        this.workspaceRoot = workspaceRoot;
+    }
+    refresh() {
+        this._onDidChangeTreeData.fire(undefined);
+    }
+    getTreeItem(element) {
+        return element;
+    }
+    async getChildren(element) {
+        if (!this.workspaceRoot) {
+            vscode.window.showInformationMessage('No dependency in empty workspace');
+            return Promise.resolve([]);
         }
-    });
-}
-// package.json を読み取ってReactに送る関数
-async function sendPackageData(webview) {
-    // 現在VS Codeで開いているフォルダ（ワークスペース）を取得
-    const workspaceFolders = vscode.workspace.workspaceFolders;
-    if (!workspaceFolders || workspaceFolders.length === 0) {
-        webview.postMessage({ command: 'error', text: 'フォルダが開かれていません。' });
-        return;
-    }
-    // 1つ目のフォルダの直下にある package.json のパスを作成
-    const packageJsonUri = vscode.Uri.joinPath(workspaceFolders[0].uri, 'package.json');
-    try {
-        // ファイルを読み込んで文字列に変換し、JSONとして解析
-        const fileData = await vscode.workspace.fs.readFile(packageJsonUri);
-        const jsonString = new TextDecoder().decode(fileData);
-        const packageJson = JSON.parse(jsonString);
-        // React側にデータを送信
-        webview.postMessage({
-            command: 'packageData',
-            data: {
-                dependencies: packageJson.dependencies || {},
-                devDependencies: packageJson.devDependencies || {},
-            },
-        });
-    }
-    catch (_error) {
-        // ファイルがない、またはJSONが壊れている場合のエラーハンドリング
-        webview.postMessage({
-            command: 'error',
-            text: 'package.json が見つからないか、読み込めません。',
-        });
+        const packageJsonUri = vscode.Uri.joinPath(this.workspaceRoot, 'package.json');
+        if (element) {
+            // 子要素（Dependenciesの中身など）を展開したとき
+            try {
+                const fileData = await vscode.workspace.fs.readFile(packageJsonUri);
+                const packageJson = JSON.parse(new TextDecoder().decode(fileData));
+                const deps = element.label === 'Dependencies' ? packageJson.dependencies : packageJson.devDependencies;
+                if (!deps)
+                    return [];
+                return Object.keys(deps).map((depName) => {
+                    return new Dependency(depName, deps[depName], vscode.TreeItemCollapsibleState.None, 'dependency');
+                });
+            }
+            catch (_e) {
+                return [];
+            }
+        }
+        else {
+            // ルート要素（Dependencies と Dev Dependencies の親フォルダ）を作成
+            return [
+                new Dependency('Dependencies', '', vscode.TreeItemCollapsibleState.Expanded, 'category'),
+                new Dependency('Dev Dependencies', '', vscode.TreeItemCollapsibleState.Expanded, 'category'),
+            ];
+        }
     }
 }
-function getWebviewContent(scriptUri, styleUri) {
-    return `<!DOCTYPE html>
-<html lang="ja">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Manage NPM Pkg</title>
-    <link href="${styleUri}" rel="stylesheet">
-</head>
-<body>
-    <div id="root"></div>
-    <script type="module" src="${scriptUri}"></script>
-</body>
-</html>`;
+// ツリーに表示するアイテムの定義
+class Dependency extends vscode.TreeItem {
+    label;
+    version;
+    collapsibleState;
+    contextValue;
+    constructor(label, version, collapsibleState, contextValue) {
+        super(label, collapsibleState);
+        this.label = label;
+        this.version = version;
+        this.collapsibleState = collapsibleState;
+        this.contextValue = contextValue;
+        this.tooltip = `${this.label}-${this.version}`;
+        this.description = this.version; // パッケージ名の右側に薄い文字でバージョンを表示
+        // アイコンの設定
+        this.iconPath =
+            this.contextValue === 'category'
+                ? new vscode.ThemeIcon('symbol-class')
+                : new vscode.ThemeIcon('package');
+    }
 }
 function deactivate() { }
 //# sourceMappingURL=extension.js.map
