@@ -6,6 +6,8 @@
 
 Modulist is a powerful and lightweight NPM package manager integrated directly into Visual Studio Code. It simplifies managing, updating, and removing dependencies with an intuitive Activity Bar interface and rich hover tooltips.
 
+If you're interested, please give it a star⭐!
+
 > 🇯🇵 **[日本語のドキュメント (Japanese README) はこちら](./README.ja.md)**
 
 ## 🌟 Features
