@@ -16,6 +16,16 @@
   "categories": [
     "Other"
   ],
+  "keywords": [
+    "npm",
+    "pnpm",
+    "package",
+    "package manager",
+    "npm package",
+    "dependency",
+    "dependencies",
+    "manager"
+  ],
   "activationEvents": [],
   "main": "./out/extension.js",
   "contributes": {
