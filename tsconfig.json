@@ -3,23 +3,14 @@
     "module": "commonjs",
     "target": "ES2022",
     "outDir": "out",
-    "lib": [
-      "ES2022"
-    ],
+    "lib": ["ES2022"],
     "sourceMap": true,
     "rootDir": "src",
     "strict": true,
     "skipLibCheck": true,
     "esModuleInterop": true,
     "forceConsistentCasingInFileNames": true,
-    "types": [
-      "node",
-      "mocha"
-    ]
+    "types": ["node", "mocha"]
   },
-  "exclude": [
-    "node_modules",
-    ".vscode-test",
-    "webview-ui"
-  ]
+  "exclude": ["node_modules", ".vscode-test", "webview-ui"]
 }
