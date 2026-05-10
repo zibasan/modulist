@@ -4,6 +4,11 @@
   <img src="icon.png" width="128" alt="Modulist Icon">
 </p>
 
+<p align="center">
+  <img src="demo-ja.gif" alt="GIF">
+</p>
+
+
 **Modulist** は、Visual Studio Code に直接統合された、強力で軽量な NPM パッケージマネージャーです。直感的なアクティビティバーとリッチなホバーツールチップにより、依存関係の管理、アップデート、削除を劇的にシンプルにします。
 
 ## 🌟 主な機能

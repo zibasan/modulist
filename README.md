@@ -4,6 +4,10 @@
   <img src="icon.png" width="128" alt="Modulist Icon">
 </p>
 
+<p align="center">
+  <img src="demo-en.gif" alt="GIF">
+</p>
+
 Modulist is a powerful and lightweight NPM package manager integrated directly into Visual Studio Code. It simplifies managing, updating, and removing dependencies with an intuitive Activity Bar interface and rich hover tooltips.
 
 If you're interested, please give it a star⭐!
