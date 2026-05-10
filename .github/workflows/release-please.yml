@@ -1,19 +1,56 @@
-name: Release Please
+name: Release and Build
 
 on:
   push:
     branches:
-      - main # メインのブランチ名が master の場合は master に変更してください
+      - main
 
 permissions:
   contents: write
   pull-requests: write
 
 jobs:
+  # ジョブ1：リリースの判定と作成
   release-please:
     runs-on: ubuntu-latest
+    outputs:
+      # 【重要】ジョブ2へ「リリースが作成されたか」と「タグ名」を渡すための設定
+      release_created: ${{ steps.release.outputs.release_created }}
+      tag_name: ${{ steps.release.outputs.tag_name }}
     steps:
-      - uses: google-github-actions/release-please-action@v4
+      - uses: googleapis/release-please-action@v4
+        id: release
         with:
-          # VS Code拡張機能はNode.jsプロジェクトなので 'node' を指定します
           release-type: node
+
+  # ジョブ2：VSIXのビルドとアップロード
+  build-vsix:
+    needs: release-please # ジョブ1が終わるのを待つ
+    if: needs.release-please.outputs.release_created == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'pnpm'
+
+      - name: Install Dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Package Extension
+        run: npx @vscode/vsce package
+
+      - name: Upload .vsix to Release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release upload ${{ needs.release-please.outputs.tag_name }} *.vsix
