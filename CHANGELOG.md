@@ -4,6 +4,13 @@ All notable changes to the "manage-npm-pkg" extension will be documented in this
 
 Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how to structure this file.
 
+## [1.0.3](https://github.com/zibasan/modulist/compare/v1.0.2...v1.0.3) (2026-05-10)
+
+
+### Miscellaneous Chores
+
+* Release Pleaseが自動でvsixを生成してReleasesに貼るように設定 ([a223229](https://github.com/zibasan/modulist/commit/a2232293ac5e4e86c9a563d83fdabf4ff2e4ecb3))
+
 ## [1.0.2](https://github.com/zibasan/modulist/compare/v1.0.0...v1.0.2) (2026-05-10)
 
 
