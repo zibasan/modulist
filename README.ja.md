@@ -5,7 +5,7 @@
 </p>
 
 <p align="center">
-  <img src="demo-ja.gif" alt="GIF">
+  <img src="https://raw.githubusercontent.com/zibasan/modulist/main/demo-ja.gif" alt="GIF">
 </p>
 
 

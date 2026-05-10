@@ -5,7 +5,7 @@
 </p>
 
 <p align="center">
-  <img src="demo-en.gif" alt="GIF">
+  <img src="https://raw.githubusercontent.com/zibasan/modulist/main/demo-en.gif" alt="GIF">
 </p>
 
 Modulist is a powerful and lightweight NPM package manager integrated directly into Visual Studio Code. It simplifies managing, updating, and removing dependencies with an intuitive Activity Bar interface and rich hover tooltips.
