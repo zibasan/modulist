@@ -4,6 +4,13 @@ All notable changes to the "manage-npm-pkg" extension will be documented in this
 
 Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how to structure this file.
 
+## [1.0.6](https://github.com/zibasan/modulist/compare/v1.0.5...v1.0.6) (2026-05-10)
+
+
+### Bug Fixes
+
+* trigger v1.0.6 ([be1dec2](https://github.com/zibasan/modulist/commit/be1dec24f77577500b939efe2cee766f6ba63b60))
+
 ## [1.0.5](https://github.com/zibasan/modulist/compare/v1.0.4...v1.0.5) (2026-05-10)
 
 
