@@ -2,7 +2,7 @@
   "name": "modulist",
   "displayName": "modulist",
   "description": "A VS Code extension for managing npm packages.",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "engines": {
     "vscode": "^1.118.0"
   },
